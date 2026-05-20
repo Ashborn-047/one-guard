@@ -1,126 +1,149 @@
 # OneGuard 🛡️
 
-A disciplined, safety-first algorithmic cryptocurrency trading bot built in Python. Designed to run on small capital (starting with ₹1,000/week) with strict, hard-coded risk management safeguards, multi-strategy signals, and real-time dashboard telemetry.
+A disciplined, safety-first algorithmic cryptocurrency trading bot built in Python. Designed around strict, hard-coded risk management guardrails, multi-strategy signal generation, and real-time telemetry — built to trade responsibly and autonomously.
 
 ---
 
-## ◈ System Architecture
+## ◈ How It Works
 
-OneGuard is structured with modularity, decoupling data ingestion from logic validation and trade execution:
+OneGuard operates as a fully automated execution pipeline. Every 15 minutes, it polls live market data, computes technical indicators, evaluates strategy signals, validates them through a centralized risk engine, and routes approved orders to the exchange — all while broadcasting real-time alerts to Telegram.
 
 ```mermaid
 graph TD
     subgraph Ingestion [Data Pipeline]
-        MKT[Exchange Market Data] -->|Poll/15m| REST[REST API / WebSocket]
-        REST -->|CCXT Client| DB_WRITE[(SQLite Database)]
-        DB_WRITE -->|Calculate| IND[pandas-ta Indicators]
+        MKT[Exchange Market Data] -->|Poll / 15m| REST[REST API]
+        REST -->|CCXT Client| DB_WRITE[(SQLite WAL)]
+        DB_WRITE -->|Compute| IND[pandas-ta Indicators]
     end
 
     subgraph Strategies [Strategy Layer]
         IND -->|RSI| STRA[RSI Mean Reversion]
-        IND -->|Bollinger| STRB[BB Mean Bounce]
-        IND -->|EMA| STRC[EMA Trend Follow]
+        IND -->|Bollinger Bands| STRB[BB Bounce]
+        IND -->|EMA Cross| STRC[EMA Trend Follow]
     end
 
     subgraph Defense [Risk Engine]
-        STRA -->|BUY/SELL| RISK{Risk Guard}
-        STRB -->|BUY/SELL| RISK
-        STRC -->|BUY/SELL| RISK
-        RISK -->|Check Caps & Cooldowns| EXEC[Execution Router]
+        STRA -->|BUY / SELL| RISK{Risk Guard}
+        STRB -->|BUY / SELL| RISK
+        STRC -->|BUY / SELL| RISK
+        RISK -->|Validated Signal| EXEC[Execution Router]
     end
 
     subgraph Output [Interfaces & Telemetry]
-        EXEC -->|Paper/Live| EX_API[Exchange Execution]
+        EXEC -->|Sandbox / Live| EX_API[Exchange Order API]
         EX_API -->|Log Trade| DB_WRITE
         DB_WRITE -->|Query Logs| DASH[Streamlit Dashboard]
-        EX_API -->|Push Notify| TG[Telegram Alerts]
+        EX_API -->|Push Alert| TG[Telegram Bot]
     end
 ```
-
----
-
-## ◈ Directory Structure
-
-```
-├── doc/
-│   ├── 01_goals_and_vision.md         # High-level vision, mission, and guiding principles
-│   ├── 02_step_by_step_process.md     # Sequential 9-step implementation roadmap
-│   ├── 03_known_hurdles.md            # Technical risk log and mitigations
-│   ├── 04_milestones_and_targets.md   # Numeric goals and compounding schedules
-│   └── 05_tech_phases.md              # Technical phases, tech stack specifications
-├── src/
-│   ├── __init__.py
-│   ├── pipeline.py                    # Data fetching, indicator calculation, SQLite sync
-│   ├── strategies/
-│   │   ├── __init__.py
-│   │   ├── base.py                    # Base strategy class
-│   │   ├── rsi.py                     # RSI Mean Reversion Strategy
-│   │   ├── bb.py                      # Bollinger Band Bounce Strategy
-│   │   └── ema.py                     # EMA Crossover Strategy
-│   ├── risk.py                        # Risk Management Engine (Caps, Cooldowns, SL/TP)
-│   ├── execution.py                   # Order execution router (REST/WebSocket)
-│   ├── dashboard.py                   # Streamlit local analytics dashboard
-│   └── alerts.py                      # Telegram bot message handler
-├── tests/                             # Unit tests for strategies and risk guards
-├── .env.example                       # Example environment file (API keys config)
-├── .gitignore                         # Strict rules ignoring credentials & local DBs
-├── README.md                          # Master overview
-├── requirements.txt                   # Dependency list
-└── trading-bot-masterplan.html        # Original project masterplan
-```
-
----
-
-## ◈ Modular Documentation
-
-For deep dives into specific areas of the master plan, refer to the following source-of-truth files in the `doc/` directory:
-
-1. 🎯 [**Goals & Vision**](file:///e:/My%20Projects/Crypto%20Bot/doc/01_goals_and_vision.md): Read about the ultimate mission, project goals (G1-G5), and our guiding core principles.
-2. 📋 [**Step-by-Step Process**](file:///e:/My%20Projects/Crypto%20Bot/doc/02_step_by_step_process.md): Detailed 9 steps from initial environment setup to going live.
-3. ⚠️ [**Known Hurdles & Mitigation**](file:///e:/My%20Projects/Crypto%20Bot/doc/03_known_hurdles.md): Detailed runbook for handling rate-limits, connectivity losses, fee drag, and emotional biases.
-4. 📈 [**Milestones & Performance Targets**](file:///e:/My%20Projects/Crypto%20Bot/doc/04_milestones_and_targets.md): Weekly performance benchmarks, risk limits (max drawdown < 8%), and a compounding ROI projection table.
-5. ⚙️ [**Technical Development Phases**](file:///e:/My%20Projects/Crypto%20Bot/doc/05_tech_phases.md): Comprehensive breakdown of the 7 tech phases, stack specifications, strategies, and pre-launch checklists.
 
 ---
 
 ## ◈ Tech Stack
 
-* **Language:** `Python 3.10+`
-* **Exchange Library:** `CCXT`
-* **Analysis:** `pandas`, `numpy`, `pandas-ta`
-* **Database:** `SQLite`
-* **Scheduling:** `APScheduler`
-* **Dashboard:** `Streamlit`
-* **Alerting:** `Telegram Bot API`
+| Layer | Technology |
+|---|---|
+| **Language** | Python 3.10+ |
+| **Exchange Connectivity** | CCXT 4.x (Binance, Sandbox + Live) |
+| **Technical Analysis** | pandas-ta, pandas, numpy |
+| **Database** | SQLite 3 (WAL mode for concurrent reads) |
+| **Scheduling** | APScheduler 3.x (cron-based 15m intervals) |
+| **Telemetry** | Telegram Bot API (python-requests) |
+| **Dashboard** | Streamlit + Plotly |
+| **Testing** | Python unittest |
+| **Environment** | python-dotenv, frozen dataclass config |
+
+---
+
+## ◈ Risk Engine Guardrails
+
+Every signal is evaluated against a centralized safety layer before any order reaches the exchange:
+
+- **Emergency Halt Switch** — `EMERGENCY_HALT=TRUE` in `.env` instantly suspends all execution
+- **Weekly Drawdown Cap** — Auto-halt triggers if weekly realized loss breaches the configured threshold
+- **Loss Cooldown** — A 30-minute suspension activates automatically after any realized loss
+- **Duplicate Position Guard** — Only one open position per symbol allowed at any time
+- **Max Concurrent Trades Cap** — Hard limit on simultaneously open positions across all symbols
+- **Strategy Isolation Lock** — Exit (SELL) orders are only accepted from the same strategy that opened the position
+
+---
+
+## ◈ Strategies
+
+| Strategy | Signal Logic |
+|---|---|
+| **RSI Mean Reversion** | BUY when RSI < 30 (oversold), SELL when RSI > 70 (overbought) |
+| **Bollinger Band Bounce** | BUY when price touches lower band, SELL when price touches upper band |
+| **EMA Crossover** | BUY when Fast EMA (9) crosses above Slow EMA (21), SELL on reverse cross |
+
+All strategies share a unified signal interface returning `BUY`, `SELL`, or `HOLD`.
 
 ---
 
 ## ◈ Setup & Installation
 
-### 1. Clone the repository and navigate to the project directory:
+### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/one-guard.git
+git clone https://github.com/Ashborn-047/one-guard.git
 cd one-guard
 ```
 
-### 2. Set up the virtual environment:
+### 2. Set up the virtual environment
 ```bash
 python -m venv venv
-# On Windows (PowerShell):
+
+# Windows (PowerShell)
 .\venv\Scripts\Activate.ps1
-# On Linux/macOS:
+
+# Linux / macOS
 source venv/bin/activate
 ```
 
-### 3. Install dependencies:
+### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure credentials:
-Copy `.env.example` to `.env` and fill in your details:
+### 4. Configure environment
 ```bash
 cp .env.example .env
 ```
+
+Edit `.env` with your Binance API credentials and Telegram bot details.
+
 > [!CAUTION]
-> Never commit the `.env` file to version control. Ensure it is listed in `.gitignore`. Ensure exchange keys have **Read/Write (Trading)** enabled, but **Withdrawals** strictly disabled.
+> Never commit `.env` to version control. Exchange API keys must have **Read + Trade** permissions only — **Withdrawals must be strictly disabled**.
+
+### 5. Run in sandbox mode (safe — uses Binance Testnet)
+```bash
+python -m src.pipeline --once
+```
+
+### 6. Run the full scheduler
+```bash
+python -m src.pipeline
+```
+
+---
+
+## ◈ Documentation
+
+Deep-dive references are in the `doc/` directory:
+
+- 🎯 [Goals & Vision](doc/01_goals_and_vision.md) — Mission and guiding principles
+- 📋 [Step-by-Step Process](doc/02_step_by_step_process.md) — 9-step implementation roadmap
+- ⚠️ [Known Hurdles](doc/03_known_hurdles.md) — Rate limits, connectivity risks, mitigation strategies
+- ⚙️ [Technical Phases](doc/05_tech_phases.md) — Stack specs, phase breakdown, pre-launch checklist
+
+---
+
+## ◈ Project Status
+
+Track real-time implementation progress, phase completion, module health, and developer session logs in the interactive dashboard:
+
+```
+project_status.html  ← open in any browser
+```
+
+> [!NOTE]
+> Always run `python -m unittest tests/test_risk_and_strategies.py` before pushing new code to verify all risk guardrails remain intact.
