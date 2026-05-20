@@ -1,4 +1,4 @@
-# AegisAlgo 🛡️
+# OneGuard 🛡️
 
 A disciplined, safety-first algorithmic cryptocurrency trading bot built in Python. Designed to run on small capital (starting with ₹1,000/week) with strict, hard-coded risk management safeguards, multi-strategy signals, and real-time dashboard telemetry.
 
@@ -6,7 +6,7 @@ A disciplined, safety-first algorithmic cryptocurrency trading bot built in Pyth
 
 ## ◈ System Architecture
 
-AegisAlgo is structured with modularity, decoupling data ingestion from logic validation and trade execution:
+OneGuard is structured with modularity, decoupling data ingestion from logic validation and trade execution:
 
 ```mermaid
 graph TD
@@ -99,8 +99,8 @@ For deep dives into specific areas of the master plan, refer to the following so
 
 ### 1. Clone the repository and navigate to the project directory:
 ```bash
-git clone https://github.com/your-username/aegis-algo.git
-cd aegis-algo
+git clone https://github.com/your-username/one-guard.git
+cd one-guard
 ```
 
 ### 2. Set up the virtual environment:

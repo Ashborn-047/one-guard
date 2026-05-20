@@ -1,6 +1,6 @@
 # Goals & Vision
 
-This document serves as the high-level guiding framework and source of truth for the AegisAlgo project.
+This document serves as the high-level guiding framework and source of truth for the OneGuard project.
 
 ---
 
