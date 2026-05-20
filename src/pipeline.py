@@ -8,6 +8,9 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from src.config import settings
 from src.db import initialize_db, save_candles, get_latest_candles, save_indicators
 from src.indicators import calculate_technical_indicators
+from src.strategies import evaluate_all_strategies
+from src.execution import check_and_execute_exits, execute_market_order
+from src.telemetry import alert_bot_startup, alert_system_error
 
 logger = logging.getLogger("OneGuard.Pipeline")
 
@@ -96,11 +99,25 @@ def run_pipeline_cycle(exchange: ccxt.Exchange):
                     f"RSI: {latest_indicators['rsi']:.2f} | "
                     f"BB Upper: {latest_indicators['bb_upper']:.2f}"
                 )
+                
+                # 6. Check and execute exits (SL/TP targets)
+                check_and_execute_exits(exchange)
+                
+                # 7. Evaluate and execute strategy signals
+                signals = evaluate_all_strategies(symbol)
+                for strategy_name, signal in signals.items():
+                    if signal == "BUY":
+                        logger.info(f"Signal triggered: {strategy_name} -> BUY {symbol}. Attempting entry...")
+                        execute_market_order(exchange, symbol, "BUY", strategy_name)
+                    elif signal == "SELL":
+                        logger.info(f"Signal triggered: {strategy_name} -> SELL {symbol}. Attempting exit...")
+                        execute_market_order(exchange, symbol, "SELL", strategy_name)
             else:
                 logger.error(f"Failed to save indicators for {symbol} to database.")
                 
         except Exception as e:
             logger.error(f"Error in pipeline cycle for {symbol}: {e}", exc_info=True)
+            alert_system_error(f"pipeline_cycle:{symbol}", e)
 
     logger.info("Pipeline cycle execution complete.")
 
@@ -127,6 +144,7 @@ def start_scheduler():
     )
     
     logger.info("Pipeline Scheduler started. Running every 15 minutes...")
+    alert_bot_startup(settings.mode, TRADING_SYMBOLS)
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):

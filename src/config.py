@@ -46,6 +46,12 @@ class Config:
     # Safety Override Guard
     emergency_halt: bool = os.getenv("EMERGENCY_HALT", "FALSE").strip().upper() == "TRUE"
 
+    # Risk Management Settings (Defaulting to USDT amounts due to exchange min_notional constraints)
+    max_position_size: float = float(os.getenv("MAX_POSITION_SIZE", "10.0").strip())
+    max_open_trades: int = int(os.getenv("MAX_OPEN_TRADES", "3").strip())
+    weekly_drawdown_limit: float = float(os.getenv("WEEKLY_DRAWDOWN_LIMIT", "15.0").strip())
+    loss_cooldown_minutes: int = int(os.getenv("LOSS_COOLDOWN_MINUTES", "30").strip())
+
     @property
     def is_sandbox(self) -> bool:
         return self.mode == "sandbox"

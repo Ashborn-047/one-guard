@@ -223,8 +223,39 @@ def log_trade(trade_data: Dict[str, Any]) -> bool:
         return False
 
 
+def get_strategy_data(symbol: str, limit: int = 100) -> Any:
+    """
+    Retrieves merged candle and indicator data for a symbol as a pandas DataFrame,
+    ordered chronologically (oldest to newest).
+    """
+    import pandas as pd
+    try:
+        with get_db_connection() as conn:
+            query = """
+                SELECT c.timestamp, c.open, c.high, c.low, c.close, c.volume,
+                       i.rsi, i.ema_fast, i.ema_slow, i.bb_upper, i.bb_middle, i.bb_lower
+                FROM candles c
+                LEFT JOIN indicators i ON c.symbol = i.symbol AND c.timestamp = i.timestamp
+                WHERE c.symbol = ?
+                ORDER BY c.timestamp DESC
+                LIMIT ?
+            """
+            df = pd.read_sql_query(query, conn, params=(symbol, limit))
+            # Reverse to order chronologically (oldest to newest)
+            df = df.iloc[::-1].reset_index(drop=True)
+            return df
+    except Exception as e:
+        logger.error(f"Failed to fetch merged strategy data for {symbol}: {e}")
+        return pd.DataFrame()
+
+
 if __name__ == "__main__":
     # Test initialization when run directly
     logging.basicConfig(level=logging.INFO)
     success = initialize_db()
     print(f"\nDatabase Initialization Status: {success}")
+    
+    # Test data retrieval
+    df = get_strategy_data("BTC/USDT", 5)
+    print(f"Sample strategy DataFrame (len={len(df)}):")
+    print(df.head() if not df.empty else "Empty DataFrame")
