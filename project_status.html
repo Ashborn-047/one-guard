@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneGuard - Interactive Project Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #090b10;
+            --bg-panel: rgba(17, 22, 34, 0.7);
+            --bg-panel-solid: #111622;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-success: #10b981;
+            --accent-success-glow: rgba(16, 185, 129, 0.15);
+            --accent-info: #3b82f6;
+            --accent-info-glow: rgba(59, 130, 246, 0.15);
+            --accent-warning: #f59e0b;
+            --accent-warning-glow: rgba(245, 158, 11, 0.15);
+            --accent-planned: #4b5563;
+            --accent-planned-glow: rgba(75, 85, 99, 0.15);
+            --neon-purple: #8b5cf6;
+            --neon-cyan: #06b6d4;
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-sans: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --shadow-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            padding: 2.5rem 1.5rem;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* HEADER SECTION */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+            background: var(--bg-panel);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .header-left h1 {
+            font-family: var(--font-display);
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            background: linear-gradient(to right, #ffffff, #a78bfa, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .header-left h1::before {
+            content: '';
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-success);
+            box-shadow: 0 0 12px var(--accent-success);
+        }
+
+        .header-left p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .header-right {
+            text-align: right;
+        }
+
+        .overall-progress {
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--neon-cyan);
+            font-family: var(--font-display);
+        }
+
+        .progress-bar-container {
+            width: 220px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%; /* Dynamically calculated by JS */
+            background: linear-gradient(to right, var(--neon-purple), var(--neon-cyan));
+            border-radius: 999px;
+            box-shadow: 0 0 8px rgba(6, 182, 212, 0.5);
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* FILTERS SECTION */
+        .filters {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 0.4rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            width: fit-content;
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            font-family: var(--font-display);
+        }
+
+        .filter-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--bg-panel-solid);
+            color: var(--text-primary);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            border: 1px solid var(--border-color);
+        }
+
+        /* GRID LAYOUT FOR PHASES */
+        .phases-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        @media (min-width: 900px) {
+            .phases-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .phase-card {
+            background: var(--bg-panel);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: var(--shadow-glow);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .phase-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .phase-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1.25rem;
+        }
+
+        .phase-title {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .phase-timeline {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            letter-spacing: 0.05em;
+        }
+
+        /* Status Colors */
+        .status-completed {
+            background: var(--accent-success-glow);
+            color: var(--accent-success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.05);
+        }
+
+        .status-inprogress {
+            background: var(--accent-info-glow);
+            color: var(--accent-info);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.05);
+        }
+
+        .status-planned {
+            background: var(--accent-planned-glow);
+            color: var(--text-secondary);
+            border: 1px solid rgba(75, 85, 99, 0.3);
+        }
+
+        .task-list {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .task-checkbox {
+            margin-top: 0.15rem;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            accent-color: var(--neon-cyan);
+            cursor: pointer;
+        }
+
+        .task-text {
+            line-height: 1.4;
+        }
+
+        .task-item.completed .task-text {
+            text-decoration: line-through;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .phase-footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .phase-progress-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .phase-progress-bar {
+            width: 100px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .phase-progress-fill {
+            height: 100%;
+            background: var(--neon-cyan);
+            width: 0%;
+            border-radius: 999px;
+        }
+
+        /* TECHNICAL GUARDRAILS & METRICS PANEL */
+        .sidebar-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        @media (min-width: 900px) {
+            .sidebar-grid {
+                grid-template-columns: 1fr 2fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .panel-title {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 0.9rem;
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+        }
+
+        .metric-value {
+            font-weight: 600;
+            font-family: var(--font-display);
+        }
+
+        .text-green { color: var(--accent-success); }
+        .text-blue { color: var(--accent-info); }
+        .text-purple { color: var(--neon-purple); }
+
+        .guardrail-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .guardrail-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            font-family: var(--font-display);
+        }
+
+        .guardrail-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* CONSOLE TERMINAL LOG */
+        .terminal-log {
+            background: #05070a;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            font-family: var(--font-mono);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding-bottom: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .terminal-title {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .terminal-circle {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .tc-red { background: #ef4444; }
+        .tc-yellow { background: #f59e0b; }
+        .tc-green { background: #10b981; }
+
+        .terminal-body {
+            max-height: 250px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .log-time {
+            color: var(--neon-purple);
+            flex-shrink: 0;
+        }
+
+        .log-text {
+            color: #d1d5db;
+        }
+
+        .log-tag {
+            color: var(--neon-cyan);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- HEADER -->
+        <header>
+            <div class="header-left">
+                <h1>OneGuard Trading Bot</h1>
+                <p>Safety-First Algorithmic Crypto Execution Pipeline & Dashboard Tracker</p>
+            </div>
+            <div class="header-right">
+                <div class="overall-progress">System Progress: <span id="progress-percentage">0%</span></div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="overall-bar"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- FILTERS -->
+        <div class="filters">
+            <button class="filter-btn active" onclick="filterPhases('all')">All Phases</button>
+            <button class="filter-btn" onclick="filterPhases('completed')">Completed</button>
+            <button class="filter-btn" onclick="filterPhases('inprogress')">In Progress</button>
+            <button class="filter-btn" onclick="filterPhases('planned')">Planned</button>
+        </div>
+
+        <!-- PHASES GRID -->
+        <main class="phases-grid" id="phases-container">
+            
+            <!-- Phase 1 -->
+            <section class="phase-card" data-status="completed">
+                <div>
+                    <div class="phase-header">
+                        <div>
+                            <h2 class="phase-title">Phase 1: Environment & Tooling</h2>
+                            <p class="phase-timeline">Milestone Timeline: Day 1</p>
+                        </div>
+                        <span class="status-badge status-completed">Completed</span>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item completed">
+                            <input type="checkbox" class="task-checkbox" checked disabled>
+                            <span class="task-text">Initialize Git local repository & link to GitHub main remote.</span>
+                        </li>
+                        <li class="task-item completed">
+                            <input type="checkbox" class="task-checkbox" checked disabled>
+                            <span class="task-text">Configure Python virtual environment (venv) & project folders.</span>
+                        </li>
+                        <li class="task-item completed">
+                            <input type="checkbox" class="task-checkbox" checked disabled>
+                            <span class="task-text">Write .gitignore, .env.example, and pin requirements.txt dependencies.</span>
+                        </li>
+                        <li class="task-item completed">
+                            <input type="checkbox" class="task-checkbox" checked disabled>
+                            <span class="task-text">Implement dataclass-based settings loader & config validator (src/config.py).</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="phase-footer">
+                    <span class="phase-progress-text">Progress: 100%</span>
+                    <div class="phase-progress-bar">
+                        <div class="phase-progress-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 2 -->
+            <section class="phase-card" data-status="completed">
+                <div>
+                    <div class="phase-header">
+                        <div>
+                            <h2 class="phase-title">Phase 2: Ingestion & Indicators</h2>
+                            <p class="phase-timeline">Milestone Timeline: Day 1-2</p>
+                        </div>
+                        <span class="status-badge status-completed">Completed</span>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item completed">
+                            <input type="checkbox" class="task-checkbox" checked disabled>
+                            <span class="task-text">Implement CCXT Exchange Connectivity Tester with latency diagnostics.</span>
+                        </li>
+                        <li class="task-item completed">
+                            <input type="checkbox" class="task-checkbox" checked disabled>
+                            <span class="task-text">Design local SQLite database schema & indexes (candles, indicators, trades).</span>
+                        </li>
+                        <li class="task-item completed">
+                            <input type="checkbox" class="task-checkbox" checked disabled>
+                            <span class="task-text">Configure pandas-ta mathematical calculations (RSI, Bollinger Bands, EMAs).</span>
+                        </li>
+                        <li class="task-item completed">
+                            <input type="checkbox" class="task-checkbox" checked disabled>
+                            <span class="task-text">Write cron pipeline scheduler script (src/pipeline.py) for recurring ingestion.</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="phase-footer">
+                    <span class="phase-progress-text">Progress: 100%</span>
+                    <div class="phase-progress-bar">
+                        <div class="phase-progress-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 3 -->
+            <section class="phase-card" data-status="inprogress">
+                <div>
+                    <div class="phase-header">
+                        <div>
+                            <h2 class="phase-title">Phase 3: Core Logic & Risk Engine</h2>
+                            <p class="phase-timeline">Milestone Timeline: Day 3-5</p>
+                        </div>
+                        <span class="status-badge status-inprogress">In Progress</span>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p3-1" onchange="calculateOverallProgress()">
+                            <span class="task-text">Implement position sizing module (Kelly / account % sizing).</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p3-2" onchange="calculateOverallProgress()">
+                            <span class="task-text">Write centralized stop-loss (SL) and take-profit (TP) order routers.</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p3-3" onchange="calculateOverallProgress()">
+                            <span class="task-text">Implement RSI & Bollinger Band signal triggers in strategies/ folder.</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p3-4" onchange="calculateOverallProgress()">
+                            <span class="task-text">Create centralized executor runner that coordinates pipeline with signals.</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="phase-footer">
+                    <span class="phase-progress-text" id="p3-progress-text">Progress: 0%</span>
+                    <div class="phase-progress-bar">
+                        <div class="phase-progress-fill" id="p3-progress-fill"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 4 -->
+            <section class="phase-card" data-status="planned">
+                <div>
+                    <div class="phase-header">
+                        <div>
+                            <h2 class="phase-title">Phase 4: Telemetry & Dashboard</h2>
+                            <p class="phase-timeline">Milestone Timeline: Day 6-7</p>
+                        </div>
+                        <span class="status-badge status-planned">Planned</span>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p4-1" onchange="calculateOverallProgress()">
+                            <span class="task-text">Set up Telegram Bot alert handler for trade entry/exit and errors.</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p4-2" onchange="calculateOverallProgress()">
+                            <span class="task-text">Build Streamlit web interface showing active positions, PnL, and DB logs.</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p4-3" onchange="calculateOverallProgress()">
+                            <span class="task-text">Integrate performance summary reports (Win Rate, Profit Factor).</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="phase-footer">
+                    <span class="phase-progress-text" id="p4-progress-text">Progress: 0%</span>
+                    <div class="phase-progress-bar">
+                        <div class="phase-progress-fill" id="p4-progress-fill"></div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- SIDEBAR DATA PANELS -->
+        <div class="sidebar-grid">
+            
+            <!-- Metrics Panel -->
+            <div class="panel">
+                <h3 class="panel-title">🛡️ Trading Safety Targets</h3>
+                <div class="metric-row">
+                    <span class="metric-label">Max Risk Per Trade</span>
+                    <span class="metric-value text-green">1.5% - 2%</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Max Weekly Drawdown Limit</span>
+                    <span class="metric-value text-blue">8.0% Halt</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Min Target Win Rate</span>
+                    <span class="metric-value text-purple">> 55%</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Trading Symbols</span>
+                    <span class="metric-value">BTC/USDT, ETH/USDT</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Execution Timeframe</span>
+                    <span class="metric-value">15 Minute Intervals</span>
+                </div>
+            </div>
+
+            <!-- Guardrails Panel -->
+            <div class="panel">
+                <h3 class="panel-title">⚠️ Core Implementation Hurdles</h3>
+                
+                <div class="guardrail-card">
+                    <div class="guardrail-header">⏰ Clock Synchronization Offset</div>
+                    <div class="guardrail-desc">Windows and VPS hosts regularly drift. We test offset dynamically against Binance servers (must be < 1000ms offset) to avoid request authentication failures.</div>
+                </div>
+
+                <div class="guardrail-card">
+                    <div class="guardrail-header">🚦 CCXT Rate Limiters</div>
+                    <div class="guardrail-desc">Binance enforces a weight-limit (typically 1200/min). We configure `enableRateLimit: true` and cache calculations locally in SQLite to restrict exchange hits.</div>
+                </div>
+
+                <div class="guardrail-card">
+                    <div class="guardrail-header">🔒 Key Safety Policy</div>
+                    <div class="guardrail-desc">API credentials must NEVER have withdrawal permissions active. Live trades must always be preceded by Sandbox Testnet validation.</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- CONSOLE TERMINAL -->
+        <div class="terminal-log">
+            <div class="terminal-header">
+                <div class="terminal-title">
+                    <span class="terminal-circle tc-red"></span>
+                    <span class="terminal-circle tc-yellow"></span>
+                    <span class="terminal-circle tc-green"></span>
+                    <span style="margin-left: 0.5rem;">developer_log_terminal</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">SESSION: ACTIVE</div>
+            </div>
+            <div class="terminal-body" id="terminal-body">
+                <div class="log-entry">
+                    <span class="log-time">[2026-05-20 22:45]</span>
+                    <span class="log-text"><span class="log-tag">[INIT]</span> Initialized local project repository under name <span class="text-blue">OneGuard</span>. Created directories and source structure.</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">[2026-05-20 23:05]</span>
+                    <span class="log-text"><span class="log-tag">[CONFIG]</span> Created settings validation schemas in <span class="text-purple">src/config.py</span>. Validated local environment variables.</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">[2026-05-20 23:10]</span>
+                    <span class="log-text"><span class="log-tag">[DB]</span> Configured SQLite database with WAL Mode. Created tables: candles, indicators, trades. Indexed composite keys.</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">[2026-05-20 23:13]</span>
+                    <span class="log-text"><span class="log-tag">[PIPELINE]</span> Integrated CCXT exchange client, built pandas-ta indicator module, and ran successful standalone cycle pulling BTC and ETH candles.</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">[2026-05-20 23:15]</span>
+                    <span class="log-text"><span class="log-tag">[DEPLOY]</span> Pushed verified codebase to remote GitHub repository <span class="text-green">https://github.com/Ashborn-047/one-guard.git</span>.</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JAVASCRIPT FOR INTERACTION -->
+    <script>
+        // Filters tabs toggles
+        function filterPhases(status) {
+            // Update active button
+            const buttons = document.querySelectorAll('.filter-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Toggle cards visibility
+            const cards = document.querySelectorAll('.phase-card');
+            cards.forEach(card => {
+                if (status === 'all') {
+                    card.style.display = 'flex';
+                } else {
+                    const cardStatus = card.getAttribute('data-status');
+                    if (cardStatus === status) {
+                        card.style.display = 'flex';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        // Calculate progress percentages
+        function calculateOverallProgress() {
+            // Total tasks inside all cards (fixed completed tasks count + checklist inputs)
+            const completedCardsTasks = 8; // Phase 1 (4) + Phase 2 (4)
+            const checkboxes = document.querySelectorAll('.task-checkbox:not([disabled])');
+            let checkedCount = 0;
+            
+            checkboxes.forEach(box => {
+                if (box.checked) checkedCount++;
+            });
+
+            const totalCompleted = completedCardsTasks + checkedCount;
+            const totalTasks = completedCardsTasks + checkboxes.length;
+            const overallPercent = Math.round((totalCompleted / totalTasks) * 100);
+
+            // Update Header progress
+            document.getElementById('progress-percentage').innerText = overallPercent + '%';
+            document.getElementById('overall-bar').style.width = overallPercent + '%';
+
+            // Calculate Phase 3 progress individually
+            const p3Checkboxes = document.querySelectorAll('#phases-container section:nth-of-type(3) .task-checkbox');
+            let p3Checked = 0;
+            p3Checkboxes.forEach(box => { if (box.checked) p3Checked++; });
+            const p3Percent = Math.round((p3Checked / p3Checkboxes.length) * 100);
+            document.getElementById('p3-progress-text').innerText = 'Progress: ' + p3Percent + '%';
+            document.getElementById('p3-progress-fill').style.width = p3Percent + '%';
+            
+            // Calculate Phase 4 progress individually
+            const p4Checkboxes = document.querySelectorAll('#phases-container section:nth-of-type(4) .task-checkbox');
+            let p4Checked = 0;
+            p4Checkboxes.forEach(box => { if (box.checked) p4Checked++; });
+            const p4Percent = Math.round((p4Checked / p4Checkboxes.length) * 100);
+            document.getElementById('p4-progress-text').innerText = 'Progress: ' + p4Percent + '%';
+            document.getElementById('p4-progress-fill').style.width = p4Percent + '%';
+
+            // Dynamically update card status badge based on checkbox status
+            const p3Card = document.querySelectorAll('.phase-card')[2];
+            const p3Badge = p3Card.querySelector('.status-badge');
+            if (p3Percent === 100) {
+                p3Card.setAttribute('data-status', 'completed');
+                p3Badge.className = 'status-badge status-completed';
+                p3Badge.innerText = 'Completed';
+            } else if (p3Percent > 0) {
+                p3Card.setAttribute('data-status', 'inprogress');
+                p3Badge.className = 'status-badge status-inprogress';
+                p3Badge.innerText = 'In Progress';
+            } else {
+                p3Card.setAttribute('data-status', 'inprogress');
+                p3Badge.className = 'status-badge status-inprogress';
+                p3Badge.innerText = 'In Progress';
+            }
+
+            const p4Card = document.querySelectorAll('.phase-card')[3];
+            const p4Badge = p4Card.querySelector('.status-badge');
+            if (p4Percent === 100) {
+                p4Card.setAttribute('data-status', 'completed');
+                p4Badge.className = 'status-badge status-completed';
+                p4Badge.innerText = 'Completed';
+            } else if (p4Percent > 0) {
+                p4Card.setAttribute('data-status', 'inprogress');
+                p4Badge.className = 'status-badge status-inprogress';
+                p4Badge.innerText = 'In Progress';
+            } else {
+                p4Card.setAttribute('data-status', 'planned');
+                p4Badge.className = 'status-badge status-planned';
+                p4Badge.innerText = 'Planned';
+            }
+        }
+
+        // Run calculations on startup
+        window.addEventListener('DOMContentLoaded', () => {
+            calculateOverallProgress();
+            
+            // Auto scroll developer terminal log to the bottom
+            const term = document.getElementById('terminal-body');
+            term.scrollTop = term.scrollHeight;
+        });
+    </script>
+</body>
+</html>
