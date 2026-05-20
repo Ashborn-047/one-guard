@@ -189,12 +189,13 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            cursor: pointer;
         }
 
         .phase-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 40px rgba(139, 92, 246, 0.15);
+            border-color: rgba(139, 92, 246, 0.4);
         }
 
         .phase-header {
@@ -249,6 +250,7 @@
         .task-list {
             list-style: none;
             margin-bottom: 1.5rem;
+            pointer-events: none; /* Let clicks pass through to the card container */
         }
 
         .task-item {
@@ -266,7 +268,6 @@
             height: 16px;
             border-radius: 4px;
             accent-color: var(--neon-cyan);
-            cursor: pointer;
         }
 
         .task-text {
@@ -305,6 +306,16 @@
             background: var(--neon-cyan);
             width: 0%;
             border-radius: 999px;
+        }
+
+        .click-hint {
+            font-size: 0.75rem;
+            color: var(--neon-cyan);
+            opacity: 0.8;
+            margin-top: 0.5rem;
+            text-align: right;
+            display: block;
+            font-weight: 500;
         }
 
         /* TECHNICAL GUARDRAILS & METRICS PANEL */
@@ -454,6 +465,204 @@
             color: var(--neon-cyan);
             font-weight: bold;
         }
+
+        /* INTERACTIVE MODAL OVERLAY */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(5, 7, 10, 0.85);
+            backdrop-filter: blur(20px);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            padding: 1.5rem;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: var(--bg-panel-solid);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            width: 100%;
+            max-width: 750px;
+            border-radius: 20px;
+            box-shadow: 0 20px 80px rgba(0,0,0,0.8), 0 0 40px rgba(139, 92, 246, 0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: 85vh;
+            transform: scale(0.95);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .modal-header-text h2 {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .modal-header-text p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .close-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .close-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.4);
+            transform: scale(1.1);
+        }
+
+        .modal-tabs {
+            display: flex;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 2rem;
+        }
+
+        .modal-tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: 0.9rem;
+            border-bottom: 2px solid transparent;
+        }
+
+        .modal-tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-tab-btn.active {
+            color: var(--neon-cyan);
+            border-bottom-color: var(--neon-cyan);
+        }
+
+        .modal-body {
+            padding: 2rem;
+            overflow-y: auto;
+            flex-grow: 1;
+            line-height: 1.6;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .modal-list {
+            margin-left: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-list li {
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+        }
+
+        .modal-list li strong {
+            color: var(--text-primary);
+        }
+
+        .tech-pill-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .tech-pill {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            padding: 0.3rem 0.8rem;
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--neon-cyan);
+        }
+
+        .warning-box {
+            background: var(--accent-warning-glow);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            padding: 1.25rem;
+            border-radius: 12px;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+        }
+
+        .warning-box-title {
+            font-family: var(--font-display);
+            font-weight: 600;
+            color: var(--accent-warning);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .warning-box p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .code-snippet {
+            background: #05070a;
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            overflow-x: auto;
+            color: #d1d5db;
+            margin-bottom: 1.5rem;
+        }
     </style>
 </head>
 <body>
@@ -466,9 +675,9 @@
                 <p>Safety-First Algorithmic Crypto Execution Pipeline & Dashboard Tracker</p>
             </div>
             <div class="header-right">
-                <div class="overall-progress">System Progress: <span id="progress-percentage">0%</span></div>
+                <div class="overall-progress">System Progress: <span id="progress-percentage">50%</span></div>
                 <div class="progress-bar-container">
-                    <div class="progress-bar-fill" id="overall-bar"></div>
+                    <div class="progress-bar-fill" id="overall-bar" style="width: 50%;"></div>
                 </div>
             </div>
         </header>
@@ -485,7 +694,7 @@
         <main class="phases-grid" id="phases-container">
             
             <!-- Phase 1 -->
-            <section class="phase-card" data-status="completed">
+            <section class="phase-card" data-status="completed" onclick="openPhaseDetails('phase1')">
                 <div>
                     <div class="phase-header">
                         <div>
@@ -505,24 +714,27 @@
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
-                            <span class="task-text">Write .gitignore, .env.example, and pin requirements.txt dependencies.</span>
+                            <span class="task-text">Write .gitignore, .env.example, and requirements.txt dependencies.</span>
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
-                            <span class="task-text">Implement dataclass-based settings loader & config validator (src/config.py).</span>
+                            <span class="task-text">Implement settings loader & config validator (src/config.py).</span>
                         </li>
                     </ul>
                 </div>
                 <div class="phase-footer">
-                    <span class="phase-progress-text">Progress: 100%</span>
-                    <div class="phase-progress-bar">
-                        <div class="phase-progress-fill" style="width: 100%;"></div>
+                    <div>
+                        <span class="phase-progress-text">Progress: 100%</span>
+                        <div class="phase-progress-bar" style="margin-top: 4px;">
+                            <div class="phase-progress-fill" style="width: 100%;"></div>
+                        </div>
                     </div>
+                    <span class="click-hint">Click for details →</span>
                 </div>
             </section>
 
             <!-- Phase 2 -->
-            <section class="phase-card" data-status="completed">
+            <section class="phase-card" data-status="completed" onclick="openPhaseDetails('phase2')">
                 <div>
                     <div class="phase-header">
                         <div>
@@ -551,15 +763,18 @@
                     </ul>
                 </div>
                 <div class="phase-footer">
-                    <span class="phase-progress-text">Progress: 100%</span>
-                    <div class="phase-progress-bar">
-                        <div class="phase-progress-fill" style="width: 100%;"></div>
+                    <div>
+                        <span class="phase-progress-text">Progress: 100%</span>
+                        <div class="phase-progress-bar" style="margin-top: 4px;">
+                            <div class="phase-progress-fill" style="width: 100%;"></div>
+                        </div>
                     </div>
+                    <span class="click-hint">Click for details →</span>
                 </div>
             </section>
 
             <!-- Phase 3 -->
-            <section class="phase-card" data-status="inprogress">
+            <section class="phase-card" data-status="inprogress" onclick="openPhaseDetails('phase3')">
                 <div>
                     <div class="phase-header">
                         <div>
@@ -570,33 +785,36 @@
                     </div>
                     <ul class="task-list">
                         <li class="task-item">
-                            <input type="checkbox" class="task-checkbox" id="t-p3-1" onchange="calculateOverallProgress()">
+                            <input type="checkbox" class="task-checkbox" id="t-p3-1" disabled>
                             <span class="task-text">Implement position sizing module (Kelly / account % sizing).</span>
                         </li>
                         <li class="task-item">
-                            <input type="checkbox" class="task-checkbox" id="t-p3-2" onchange="calculateOverallProgress()">
+                            <input type="checkbox" class="task-checkbox" id="t-p3-2" disabled>
                             <span class="task-text">Write centralized stop-loss (SL) and take-profit (TP) order routers.</span>
                         </li>
                         <li class="task-item">
-                            <input type="checkbox" class="task-checkbox" id="t-p3-3" onchange="calculateOverallProgress()">
+                            <input type="checkbox" class="task-checkbox" id="t-p3-3" disabled>
                             <span class="task-text">Implement RSI & Bollinger Band signal triggers in strategies/ folder.</span>
                         </li>
                         <li class="task-item">
-                            <input type="checkbox" class="task-checkbox" id="t-p3-4" onchange="calculateOverallProgress()">
+                            <input type="checkbox" class="task-checkbox" id="t-p3-4" disabled>
                             <span class="task-text">Create centralized executor runner that coordinates pipeline with signals.</span>
                         </li>
                     </ul>
                 </div>
                 <div class="phase-footer">
-                    <span class="phase-progress-text" id="p3-progress-text">Progress: 0%</span>
-                    <div class="phase-progress-bar">
-                        <div class="phase-progress-fill" id="p3-progress-fill"></div>
+                    <div>
+                        <span class="phase-progress-text" id="p3-progress-text">Progress: 0%</span>
+                        <div class="phase-progress-bar" style="margin-top: 4px;">
+                            <div class="phase-progress-fill" id="p3-progress-fill" style="width: 0%;"></div>
+                        </div>
                     </div>
+                    <span class="click-hint">Click for details →</span>
                 </div>
             </section>
 
             <!-- Phase 4 -->
-            <section class="phase-card" data-status="planned">
+            <section class="phase-card" data-status="planned" onclick="openPhaseDetails('phase4')">
                 <div>
                     <div class="phase-header">
                         <div>
@@ -607,24 +825,27 @@
                     </div>
                     <ul class="task-list">
                         <li class="task-item">
-                            <input type="checkbox" class="task-checkbox" id="t-p4-1" onchange="calculateOverallProgress()">
+                            <input type="checkbox" class="task-checkbox" id="t-p4-1" disabled>
                             <span class="task-text">Set up Telegram Bot alert handler for trade entry/exit and errors.</span>
                         </li>
                         <li class="task-item">
-                            <input type="checkbox" class="task-checkbox" id="t-p4-2" onchange="calculateOverallProgress()">
+                            <input type="checkbox" class="task-checkbox" id="t-p4-2" disabled>
                             <span class="task-text">Build Streamlit web interface showing active positions, PnL, and DB logs.</span>
                         </li>
                         <li class="task-item">
-                            <input type="checkbox" class="task-checkbox" id="t-p4-3" onchange="calculateOverallProgress()">
+                            <input type="checkbox" class="task-checkbox" id="t-p4-3" disabled>
                             <span class="task-text">Integrate performance summary reports (Win Rate, Profit Factor).</span>
                         </li>
                     </ul>
                 </div>
                 <div class="phase-footer">
-                    <span class="phase-progress-text" id="p4-progress-text">Progress: 0%</span>
-                    <div class="phase-progress-bar">
-                        <div class="phase-progress-fill" id="p4-progress-fill"></div>
+                    <div>
+                        <span class="phase-progress-text" id="p4-progress-text">Progress: 0%</span>
+                        <div class="phase-progress-bar" style="margin-top: 4px;">
+                            <div class="phase-progress-fill" id="p4-progress-fill" style="width: 0%;"></div>
+                        </div>
                     </div>
+                    <span class="click-hint">Click for details →</span>
                 </div>
             </section>
 
@@ -717,16 +938,199 @@
 
     </div>
 
+    <!-- DETAILS MODAL OVERLAY -->
+    <div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOuterClick(event)">
+        <div class="modal-content">
+            
+            <div class="modal-header">
+                <div class="modal-header-text">
+                    <h2 id="modal-title">Phase Detail</h2>
+                    <p id="modal-subtitle">Subheading</p>
+                </div>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+
+            <div class="modal-tabs">
+                <button class="modal-tab-btn active" onclick="switchModalTab('overview')">Overview & Progress</button>
+                <button class="modal-tab-btn" onclick="switchModalTab('tech')">Technical notes</button>
+                <button class="modal-tab-btn" onclick="switchModalTab('guardrails')">Guardrails & Safety</button>
+            </div>
+
+            <div class="modal-body" id="modal-body-content">
+                <!-- Dynamic Content Injected Here -->
+            </div>
+
+        </div>
+    </div>
+
     <!-- JAVASCRIPT FOR INTERACTION -->
     <script>
-        // Filters tabs toggles
+        // Data Store for Phase Detail Modals
+        const phaseData = {
+            phase1: {
+                title: "Phase 1: Environment & Tooling",
+                subtitle: "Development foundations, dependency controls, and security schemas",
+                overview: `
+                    <h3>What we have done:</h3>
+                    <ul class="modal-list" style="margin-top: 0.75rem;">
+                        <li><strong>Workspace Initialization</strong>: Configured local directories, packages, and module interfaces under <code>src/</code> and <code>tests/</code>.</li>
+                        <li><strong>Git Versioning</strong>: Established full repository links, local configuration mapping, and pushed main tracking branches.</li>
+                        <li><strong>Decoupled Credentials</strong>: Written template structures for local environment configuration <code>.env.example</code>.</li>
+                        <li><strong>Dynamic Config Validator</strong>: Developed <code>src/config.py</code> utilizing dataclasses to perform load validations, check modes, verify critical keys exist, and respect <code>EMERGENCY_HALT</code> controls.</li>
+                    </ul>
+                `,
+                tech: `
+                    <h3>Technology Implementation Details:</h3>
+                    <div class="tech-pill-container" style="margin-top: 0.75rem;">
+                        <span class="tech-pill">Python 3.10+</span>
+                        <span class="tech-pill">python-dotenv</span>
+                        <span class="tech-pill">dataclasses</span>
+                        <span class="tech-pill">Git / GitHub API</span>
+                    </div>
+                    <p style="margin-bottom: 1rem;">The environment settings are isolated to prevent hardcoded credentials. Configurations are instantiated as an immutable, frozen dataclass singleton representing the system state:</p>
+                    <pre class="code-snippet">@dataclass(frozen=True)
+class Config:
+    mode: str = os.getenv("ONEGUARD_MODE", "sandbox")
+    api_key: str = os.getenv("BINANCE_API_KEY", "")
+    secret_key: str = os.getenv("BINANCE_SECRET_KEY", "")
+    emergency_halt: bool = os.getenv("EMERGENCY_HALT", "FALSE") == "TRUE"</pre>
+                `,
+                guardrails: `
+                    <div class="warning-box">
+                        <div class="warning-box-title">🚨 Credentials Security Rules</div>
+                        <p>Our credentials loader verifies that API keys are completely isolated from version control. <code>.gitignore</code> explicitly bans <code>.env</code>. The loader halts live runs immediately if settings are unstable or set to incorrect modes.</p>
+                    </div>
+                    <h3>Important things to watch out for:</h3>
+                    <ul class="modal-list">
+                        <li><strong>Local Mode Switch</strong>: Verify <code>ONEGUARD_MODE</code> is explicitly defined to prevent live execution defaults.</li>
+                        <li><strong>Emergency Halt</strong>: Setting <code>EMERGENCY_HALT=TRUE</code> in <code>.env</code> suspends all loops instantly.</li>
+                    </ul>
+                `
+            },
+            phase2: {
+                title: "Phase 2: Ingestion & Indicators",
+                subtitle: "Real-time pipeline operations, database management, and indicator calculations",
+                overview: `
+                    <h3>What we have done:</h3>
+                    <ul class="modal-list" style="margin-top: 0.75rem;">
+                        <li><strong>CCXT Client Config</strong>: Configured exchange connections dynamically initializing public/private wrappers with automatic sandbox controls and built-in rate-limiting queues.</li>
+                        <li><strong>SQLite Database Management</strong>: Developed <code>src/db.py</code> using WAL journal modes to handle atomic reads/writes under database connection thread isolation.</li>
+                        <li><strong>Mathematical Calculation Module</strong>: Created <code>src/indicators.py</code> calling <code>pandas-ta</code> to calculate RSI (14), EMA (9/21), and Bollinger Bands (20, 2).</li>
+                        <li><strong>Cron Scheduler Ingestion</strong>: Completed <code>src/pipeline.py</code> which polls candles and updates historical states continuously on 15-minute cycles.</li>
+                    </ul>
+                `,
+                tech: `
+                    <h3>Technology Implementation Details:</h3>
+                    <div class="tech-pill-container" style="margin-top: 0.75rem;">
+                        <span class="tech-pill">ccxt 4.5+</span>
+                        <span class="tech-pill">sqlite3 WAL</span>
+                        <span class="tech-pill">pandas-ta</span>
+                        <span class="tech-pill">APScheduler</span>
+                    </div>
+                    <p style="margin-bottom: 1rem;">To guarantee clean indicator calculations, the pipeline pulls the last 100 historical candles, writes them into SQLite using composite upsert index mapping, queries them back chronologically, and appends calculations:</p>
+                    <pre class="code-snippet"># WAL (Write-Ahead Logging) Performance Config
+cursor.execute("PRAGMA journal_mode=WAL;")
+# Composite Index for Upserts
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS candles (
+        symbol TEXT, timestamp INTEGER,
+        open REAL, close REAL, ...
+        UNIQUE(symbol, timestamp) ON CONFLICT REPLACE
+    );
+""")</pre>
+                `,
+                guardrails: `
+                    <div class="warning-box">
+                        <div class="warning-box-title">⏳ Signature Offset Sync Drift</div>
+                        <p>Binance API will reject calls if the timestamp offset between your VPS/local clock and their servers exceeds 1000ms. We fetch exchange time dynamically to measure offset offsets:</p>
+                    </div>
+                    <h3>Technical limits to monitor:</h3>
+                    <ul class="modal-list">
+                        <li><strong>API Throttling Limits</strong>: CCXT uses an internal scheduler (<code>enableRateLimit: true</code>) to stay within the 1200 weight limit. Avoid spamming manual requests.</li>
+                        <li><strong>Database Lock Timeouts</strong>: High-frequency pipeline operations utilize a <code>10.0s</code> connection timeout threshold to prevent write locks.</li>
+                    </ul>
+                `
+            },
+            phase3: {
+                title: "Phase 3: Core Logic & Risk Engine",
+                subtitle: "Position sizing algorithms, trade signal triggers, and execution controllers",
+                overview: `
+                    <h3>Planned Tasks & Current Work:</h3>
+                    <ul class="modal-list" style="margin-top: 0.75rem;">
+                        <li><strong>Position Sizer (<code>src/risk.py</code>)</strong>: Formulate formulas calculating order volumes dynamically based on maximum drawdown caps and capital risk constraints.</li>
+                        <li><strong>Order Routers</strong>: Write order placing hooks mapping safety stop-loss (SL) triggers and profit-taking targets.</li>
+                        <li><strong>Strategy Rules (<code>src/strategies/rsi_bb.py</code>)</strong>: Translate indicator parameters into structural trade entry / exit decisions.</li>
+                        <li><strong>Automated Execution Core</strong>: Build the primary controller joining the pipeline scheduler with the risk engine.</li>
+                    </ul>
+                `,
+                tech: `
+                    <h3>Technology Architecture (Planned):</h3>
+                    <div class="tech-pill-container" style="margin-top: 0.75rem;">
+                        <span class="tech-pill">NumPy Sizing</span>
+                        <span class="tech-pill">ccxt private orders</span>
+                        <span class="tech-pill">Signal Routing</span>
+                    </div>
+                    <p>The risk controller acts as the gatekeeper. No order is dispatched without validating structural parameter filters:</p>
+                    <pre class="code-snippet">def check_safety_constraints(position_size, balance):
+    # Enforce strict maximum trade sizes (e.g. 2%)
+    assert position_size <= balance * 0.02, "Risk Limit Exceeded"
+    # Enforce stop-loss boundaries
+    assert stop_loss_price is not None, "SL must be set"</pre>
+                `,
+                guardrails: `
+                    <div class="warning-box" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3);">
+                        <div class="warning-box-title" style="color: #ef4444;">🛡️ Strict Drawdown Protection Policy</div>
+                        <p>The Risk Engine enforces a hard stop at 8% weekly drawdown. Realized PnL is summarized from local logs, and the bot will suspend operations automatically if the limit is violated.</p>
+                    </div>
+                    <h3>Guidelines during development:</h3>
+                    <ul class="modal-list">
+                        <li><strong>Paper Trading Validation</strong>: Test all logic flows using Binance Testnet. Real money is forbidden in Phase 3.</li>
+                        <li><strong>Order Slippage Allowances</strong>: Configure strict market limit orders instead of raw market orders to prevent slippage losses.</li>
+                    </ul>
+                `
+            },
+            phase4: {
+                title: "Phase 4: Telemetry & Dashboard",
+                subtitle: "Streamlit UI analytics, Telegram alerting handlers, and performance metrics",
+                overview: `
+                    <h3>Planned Tasks & Current Work:</h3>
+                    <ul class="modal-list" style="margin-top: 0.75rem;">
+                        <li><strong>Telegram Bot Telemetry</strong>: Establish bot notification clients that alert you instantly of trade events, execution confirmations, and system errors.</li>
+                        <li><strong>Streamlit Dashboard</strong>: Build an interactive, light-weight local web page showing active balances, database charts, trade histories, and state configurations.</li>
+                        <li><strong>Performance Analytics</strong>: Implement compounding logs, win-rate analytics, and win-to-loss factors.</li>
+                    </ul>
+                `,
+                tech: `
+                    <h3>Technology Architecture (Planned):</h3>
+                    <div class="tech-pill-container" style="margin-top: 0.75rem;">
+                        <span class="tech-pill">Streamlit</span>
+                        <span class="tech-pill">Plotly charts</span>
+                        <span class="tech-pill">requests / Telegram Bot API</span>
+                    </div>
+                    <p>Streamlit is selected for its high performance and visual integration. It queries the local database files directly, bypassing complex web API construction.</p>
+                `,
+                guardrails: `
+                    <div class="warning-box">
+                        <div class="warning-box-title">📢 Telemetry Thread Isolation</div>
+                        <p>Notifications are dispatched inside async handler loops. If Telegram API servers fail or respond slowly, it must never block the main trade execution pipeline scheduler loop.</p>
+                    </div>
+                    <h3>Important considerations:</h3>
+                    <ul class="modal-list">
+                        <li><strong>Token Encryption</strong>: Telemetry chat IDs and tokens are fully decoupled via <code>.env</code>.</li>
+                        <li><strong>Read-only DB Access</strong>: Streamlit queries the SQLite database in read-only mode to prevent write conflicts or accidental mutations.</li>
+                    </ul>
+                `
+            }
+        };
+
+        let currentActivePhase = 'phase1';
+
+        // Filters tabs toggles in main page
         function filterPhases(status) {
-            // Update active button
             const buttons = document.querySelectorAll('.filter-btn');
             buttons.forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
 
-            // Toggle cards visibility
             const cards = document.querySelectorAll('.phase-card');
             cards.forEach(card => {
                 if (status === 'all') {
@@ -742,9 +1146,57 @@
             });
         }
 
-        // Calculate progress percentages
+        // Open Modal Handler
+        function openPhaseDetails(phaseId) {
+            currentActivePhase = phaseId;
+            const data = phaseData[phaseId];
+            
+            document.getElementById('modal-title').innerText = data.title;
+            document.getElementById('modal-subtitle').innerText = data.subtitle;
+            
+            // Default to overview tab
+            switchModalTab('overview');
+            
+            // Show modal
+            document.getElementById('modal-overlay').classList.add('active');
+        }
+
+        // Close Modal Handler
+        function closeModal() {
+            document.getElementById('modal-overlay').classList.remove('active');
+        }
+
+        function closeModalOnOuterClick(event) {
+            if (event.target.id === 'modal-overlay') {
+                closeModal();
+            }
+        }
+
+        // Switch Tabs inside Modal
+        function switchModalTab(tabName) {
+            // Update active tab button style
+            const tabButtons = document.querySelectorAll('.modal-tab-btn');
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Find active tab button by onclick parameter matching the tabName
+            const activeBtn = Array.from(tabButtons).find(btn => btn.getAttribute('onclick').includes(tabName));
+            if (activeBtn) activeBtn.classList.add('active');
+
+            // Inject the corresponding content
+            const contentContainer = document.getElementById('modal-body-content');
+            const data = phaseData[currentActivePhase];
+            
+            if (tabName === 'overview') {
+                contentContainer.innerHTML = data.overview;
+            } else if (tabName === 'tech') {
+                contentContainer.innerHTML = data.tech;
+            } else if (tabName === 'guardrails') {
+                contentContainer.innerHTML = data.guardrails;
+            }
+        }
+
+        // Calculate progress percentages on main page
         function calculateOverallProgress() {
-            // Total tasks inside all cards (fixed completed tasks count + checklist inputs)
             const completedCardsTasks = 8; // Phase 1 (4) + Phase 2 (4)
             const checkboxes = document.querySelectorAll('.task-checkbox:not([disabled])');
             let checkedCount = 0;
@@ -757,7 +1209,6 @@
             const totalTasks = completedCardsTasks + checkboxes.length;
             const overallPercent = Math.round((totalCompleted / totalTasks) * 100);
 
-            // Update Header progress
             document.getElementById('progress-percentage').innerText = overallPercent + '%';
             document.getElementById('overall-bar').style.width = overallPercent + '%';
 
@@ -765,7 +1216,7 @@
             const p3Checkboxes = document.querySelectorAll('#phases-container section:nth-of-type(3) .task-checkbox');
             let p3Checked = 0;
             p3Checkboxes.forEach(box => { if (box.checked) p3Checked++; });
-            const p3Percent = Math.round((p3Checked / p3Checkboxes.length) * 100);
+            const p3Percent = Math.round((p3Checked / (p3Checkboxes.length || 1)) * 100);
             document.getElementById('p3-progress-text').innerText = 'Progress: ' + p3Percent + '%';
             document.getElementById('p3-progress-fill').style.width = p3Percent + '%';
             
@@ -773,42 +1224,9 @@
             const p4Checkboxes = document.querySelectorAll('#phases-container section:nth-of-type(4) .task-checkbox');
             let p4Checked = 0;
             p4Checkboxes.forEach(box => { if (box.checked) p4Checked++; });
-            const p4Percent = Math.round((p4Checked / p4Checkboxes.length) * 100);
+            const p4Percent = Math.round((p4Checked / (p4Checkboxes.length || 1)) * 100);
             document.getElementById('p4-progress-text').innerText = 'Progress: ' + p4Percent + '%';
             document.getElementById('p4-progress-fill').style.width = p4Percent + '%';
-
-            // Dynamically update card status badge based on checkbox status
-            const p3Card = document.querySelectorAll('.phase-card')[2];
-            const p3Badge = p3Card.querySelector('.status-badge');
-            if (p3Percent === 100) {
-                p3Card.setAttribute('data-status', 'completed');
-                p3Badge.className = 'status-badge status-completed';
-                p3Badge.innerText = 'Completed';
-            } else if (p3Percent > 0) {
-                p3Card.setAttribute('data-status', 'inprogress');
-                p3Badge.className = 'status-badge status-inprogress';
-                p3Badge.innerText = 'In Progress';
-            } else {
-                p3Card.setAttribute('data-status', 'inprogress');
-                p3Badge.className = 'status-badge status-inprogress';
-                p3Badge.innerText = 'In Progress';
-            }
-
-            const p4Card = document.querySelectorAll('.phase-card')[3];
-            const p4Badge = p4Card.querySelector('.status-badge');
-            if (p4Percent === 100) {
-                p4Card.setAttribute('data-status', 'completed');
-                p4Badge.className = 'status-badge status-completed';
-                p4Badge.innerText = 'Completed';
-            } else if (p4Percent > 0) {
-                p4Card.setAttribute('data-status', 'inprogress');
-                p4Badge.className = 'status-badge status-inprogress';
-                p4Badge.innerText = 'In Progress';
-            } else {
-                p4Card.setAttribute('data-status', 'planned');
-                p4Badge.className = 'status-badge status-planned';
-                p4Badge.innerText = 'Planned';
-            }
         }
 
         // Run calculations on startup
@@ -818,6 +1236,13 @@
             // Auto scroll developer terminal log to the bottom
             const term = document.getElementById('terminal-body');
             term.scrollTop = term.scrollHeight;
+        });
+
+        // Close on escape key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
         });
     </script>
 </body>
