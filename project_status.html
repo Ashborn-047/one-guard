@@ -674,6 +674,40 @@
             border-left: 3px solid var(--neon-cyan);
             padding-left: 0.5rem;
         }
+
+        /* KPI STATS STRIP */
+        .kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
+        @media (max-width: 768px) { .kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+        .kpi-card { background: var(--bg-panel); backdrop-filter: blur(12px); border: 1px solid var(--border-color); border-radius: 14px; padding: 1.25rem 1.5rem; position: relative; overflow: hidden; }
+        .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 14px 14px 0 0; }
+        .kpi-card.kpi-green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+        .kpi-card.kpi-blue::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+        .kpi-card.kpi-purple::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+        .kpi-card.kpi-cyan::before { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+        .kpi-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 0.5rem; font-family: var(--font-display); }
+        .kpi-value { font-size: 2rem; font-weight: 800; font-family: var(--font-display); }
+        .kpi-sub { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; }
+
+        /* MODULE HEALTH GRID */
+        .section-label { font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin: 2.5rem 0 1rem; display: flex; align-items: center; gap: 0.75rem; }
+        .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
+        .module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; margin-bottom: 2rem; }
+        .module-card { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.9rem 1.1rem; display: flex; align-items: center; gap: 0.85rem; font-size: 0.88rem; }
+        .module-card:hover { border-color: rgba(139,92,246,0.3); transform: translateY(-1px); }
+        .module-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .dot-live { background: #10b981; box-shadow: 0 0 6px #10b981; }
+        .dot-ready { background: #3b82f6; box-shadow: 0 0 6px #3b82f6; }
+        .dot-planned { background: #4b5563; }
+        .module-name { font-family: var(--font-mono); font-weight: 600; color: var(--text-primary); font-size: 0.82rem; }
+        .module-desc { color: var(--text-secondary); font-size: 0.78rem; margin-left: auto; text-align: right; flex-shrink: 0; }
+
+        /* NEXT UP PANEL */
+        .next-up { background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.08)); border: 1px solid rgba(59,130,246,0.2); border-radius: 14px; padding: 1.5rem; margin-bottom: 2.5rem; display: flex; align-items: center; gap: 1.25rem; }
+        .next-up-icon { font-size: 2rem; flex-shrink: 0; }
+        .next-up-title { font-family: var(--font-display); font-weight: 700; font-size: 1rem; color: var(--text-primary); margin-bottom: 0.25rem; }
+        .next-up-desc { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; }
+        .pulse { animation: pulse-glow 2s ease-in-out infinite; }
+        @keyframes pulse-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
@@ -683,7 +717,7 @@
         <header>
             <div class="header-left">
                 <h1>OneGuard Trading Bot</h1>
-                <p>Safety-First Algorithmic Crypto Execution Pipeline & Dashboard Tracker</p>
+                <p>Safety-First Algorithmic Crypto Execution Engine — Command Center</p>
             </div>
             <div class="header-right">
                 <div class="overall-progress">System Progress: <span id="progress-percentage">50%</span></div>
@@ -693,7 +727,56 @@
             </div>
         </header>
 
+        <!-- KPI STATS STRIP -->
+        <div class="kpi-strip">
+            <div class="kpi-card kpi-green">
+                <div class="kpi-label">Phases Completed</div>
+                <div class="kpi-value" style="color: var(--accent-success);">3 <span style="font-size:1rem;font-weight:400;color:var(--text-secondary)">/ 7</span></div>
+                <div class="kpi-sub">Environment → Risk Engine</div>
+            </div>
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-label">Active Phase</div>
+                <div class="kpi-value" style="color: var(--accent-info);">4</div>
+                <div class="kpi-sub">Telemetry & Dashboard</div>
+            </div>
+            <div class="kpi-card kpi-purple">
+                <div class="kpi-label">Source Modules</div>
+                <div class="kpi-value" style="color: var(--neon-purple);">10</div>
+                <div class="kpi-sub">8 live · 2 planned</div>
+            </div>
+            <div class="kpi-card kpi-cyan">
+                <div class="kpi-label">Unit Tests</div>
+                <div class="kpi-value" style="color: var(--neon-cyan);">8</div>
+                <div class="kpi-sub">All passing ✓</div>
+            </div>
+        </div>
+
+        <!-- MODULE HEALTH GRID -->
+        <div class="section-label">Module Health</div>
+        <div class="module-grid">
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/config.py</span><span class="module-desc">Settings & validation</span></div>
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/db.py</span><span class="module-desc">SQLite WAL database</span></div>
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/indicators.py</span><span class="module-desc">RSI, EMA, BB engine</span></div>
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/pipeline.py</span><span class="module-desc">Scheduler + ingestion</span></div>
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/risk.py</span><span class="module-desc">Safety guardrails</span></div>
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/execution.py</span><span class="module-desc">Order routing</span></div>
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/telemetry.py</span><span class="module-desc">Telegram alerts</span></div>
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/strategies/*</span><span class="module-desc">RSI, BB, EMA signals</span></div>
+            <div class="module-card"><span class="module-dot dot-planned"></span><span class="module-name">dashboard/app.py</span><span class="module-desc">Streamlit UI — planned</span></div>
+            <div class="module-card"><span class="module-dot dot-planned"></span><span class="module-name">src/analytics.py</span><span class="module-desc">PnL reports — planned</span></div>
+        </div>
+
+        <!-- NEXT UP PANEL -->
+        <div class="next-up">
+            <div class="next-up-icon pulse">🎯</div>
+            <div>
+                <div class="next-up-title">Next Milestone → Streamlit Dashboard (Phase 4)</div>
+                <div class="next-up-desc">Build <code>dashboard/app.py</code> — interactive web UI showing live positions, PnL equity curves, indicator charts, and trade history logs queried directly from SQLite in WAL read-only mode.</div>
+            </div>
+        </div>
+
         <!-- FILTERS -->
+        <div class="section-label">Development Phases</div>
         <div class="filters">
             <button class="filter-btn active" onclick="filterPhases('all')">All Phases</button>
             <button class="filter-btn" onclick="filterPhases('completed')">Completed</button>
@@ -947,6 +1030,18 @@
                 <div class="log-entry">
                     <span class="log-time">[2026-05-20 23:40]</span>
                     <span class="log-text"><span class="log-tag">[EXECUTION]</span> Implemented Order Execution Controller and connected to APScheduler scheduler loop in <span class="text-blue">src/pipeline.py</span>. Pipeline Phase 3 completed.</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">[2026-05-20 23:45]</span>
+                    <span class="log-text"><span class="log-tag">[TELEMETRY]</span> Expanded <span class="text-purple">src/telemetry.py</span> with 6 typed alert formatters (trade entry/exit, drawdown halt, cooldown, system error, bot startup). All use 5s hard timeout.</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">[2026-05-20 23:50]</span>
+                    <span class="log-text"><span class="log-tag">[WIRING]</span> Wired typed telemetry alerts into <span class="text-blue">src/execution.py</span> and <span class="text-blue">src/pipeline.py</span>. Bot startup fires alert_bot_startup(); all exceptions fire alert_system_error().</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">[2026-05-21 00:10]</span>
+                    <span class="log-text"><span class="log-tag">[DASHBOARD]</span> Upgraded <span class="text-green">project_status.html</span> with KPI stats strip, module health grid, next-milestone panel, and section labels. Command center mode active.</span>
                 </div>
             </div>
         </div>
