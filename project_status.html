@@ -250,7 +250,7 @@
         .task-list {
             list-style: none;
             margin-bottom: 1.5rem;
-            pointer-events: none; /* Let clicks pass through to the card container */
+            pointer-events: none; /* Let clicks pass through */
         }
 
         .task-item {
@@ -494,7 +494,7 @@
             background: var(--bg-panel-solid);
             border: 1px solid rgba(255, 255, 255, 0.12);
             width: 100%;
-            max-width: 750px;
+            max-width: 800px;
             border-radius: 20px;
             box-shadow: 0 20px 80px rgba(0,0,0,0.8), 0 0 40px rgba(139, 92, 246, 0.1);
             overflow: hidden;
@@ -663,6 +663,17 @@
             color: #d1d5db;
             margin-bottom: 1.5rem;
         }
+
+        .sub-section-title {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+            border-left: 3px solid var(--neon-cyan);
+            padding-left: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -706,15 +717,15 @@
                     <ul class="task-list">
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
-                            <span class="task-text">Initialize Git local repository & link to GitHub main remote.</span>
+                            <span class="task-text">Initialize Git local repository & link to GitHub remote.</span>
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
-                            <span class="task-text">Configure Python virtual environment (venv) & project folders.</span>
+                            <span class="task-text">Configure Python virtual environment (venv) & structure packages.</span>
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
-                            <span class="task-text">Write .gitignore, .env.example, and requirements.txt dependencies.</span>
+                            <span class="task-text">Write .gitignore, .env.example, and pin requirements.txt.</span>
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
@@ -746,7 +757,7 @@
                     <ul class="task-list">
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
-                            <span class="task-text">Implement CCXT Exchange Connectivity Tester with latency diagnostics.</span>
+                            <span class="task-text">Implement CCXT Exchange Connectivity Tester with clock diagnostics.</span>
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
@@ -754,11 +765,11 @@
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
-                            <span class="task-text">Configure pandas-ta mathematical calculations (RSI, Bollinger Bands, EMAs).</span>
+                            <span class="task-text">Configure pandas-ta calculations (RSI, Bollinger Bands, Fast/Slow EMAs).</span>
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" checked disabled>
-                            <span class="task-text">Write cron pipeline scheduler script (src/pipeline.py) for recurring ingestion.</span>
+                            <span class="task-text">Write cron pipeline scheduler script (src/pipeline.py) for recurring cycles.</span>
                         </li>
                     </ul>
                 </div>
@@ -952,7 +963,7 @@
 
             <div class="modal-tabs">
                 <button class="modal-tab-btn active" onclick="switchModalTab('overview')">Overview & Progress</button>
-                <button class="modal-tab-btn" onclick="switchModalTab('tech')">Technical notes</button>
+                <button class="modal-tab-btn" onclick="switchModalTab('tech')">Technical Notes</button>
                 <button class="modal-tab-btn" onclick="switchModalTab('guardrails')">Guardrails & Safety</button>
             </div>
 
@@ -965,159 +976,188 @@
 
     <!-- JAVASCRIPT FOR INTERACTION -->
     <script>
-        // Data Store for Phase Detail Modals
+        // Data Store for Phase Detail Modals (EXCEPTIONAL ELABORATE VERSION)
         const phaseData = {
             phase1: {
                 title: "Phase 1: Environment & Tooling",
-                subtitle: "Development foundations, dependency controls, and security schemas",
+                subtitle: "Development foundations, environment validation layers, and security isolation schemas",
                 overview: `
-                    <h3>What we have done:</h3>
-                    <ul class="modal-list" style="margin-top: 0.75rem;">
-                        <li><strong>Workspace Initialization</strong>: Configured local directories, packages, and module interfaces under <code>src/</code> and <code>tests/</code>.</li>
-                        <li><strong>Git Versioning</strong>: Established full repository links, local configuration mapping, and pushed main tracking branches.</li>
-                        <li><strong>Decoupled Credentials</strong>: Written template structures for local environment configuration <code>.env.example</code>.</li>
-                        <li><strong>Dynamic Config Validator</strong>: Developed <code>src/config.py</code> utilizing dataclasses to perform load validations, check modes, verify critical keys exist, and respect <code>EMERGENCY_HALT</code> controls.</li>
+                    <div class="sub-section-title">Completed Milestones</div>
+                    <ul class="modal-list">
+                        <li><strong>Modular Package Blueprint</strong>: Initialized standard directory structures (<code>src/</code>, <code>src/strategies/</code>, <code>tests/</code>) with package entry markers (<code>__init__.py</code>) to support clean local and module import resolution paths.</li>
+                        <li><strong>Safe Environment Isolation</strong>: Implemented decoupling configurations using <code>.env.example</code>. Set up local configurations in untracked <code>.env</code> settings, securing secret keys away from GitHub.</li>
+                        <li><strong>Typed Settings Validation Layer</strong>: Created a robust configuration gatekeeper class inside <code>src/config.py</code>. It uses <code>python-dotenv</code> to read system variables and automatically parses them into a frozen typed dataclass.</li>
+                        <li><strong>Automatic Sanity Handlers</strong>: Configured the initialization layer to validate execution parameters instantly on runtime. The system checks if trading modes are correct, confirms API parameters exist, and checks state switches.</li>
                     </ul>
                 `,
                 tech: `
-                    <h3>Technology Implementation Details:</h3>
-                    <div class="tech-pill-container" style="margin-top: 0.75rem;">
+                    <div class="sub-section-title">Core Technologies Installed & Utilized</div>
+                    <div class="tech-pill-container">
                         <span class="tech-pill">Python 3.10+</span>
                         <span class="tech-pill">python-dotenv</span>
                         <span class="tech-pill">dataclasses</span>
-                        <span class="tech-pill">Git / GitHub API</span>
+                        <span class="tech-pill">Git / GitHub Remote API</span>
                     </div>
-                    <p style="margin-bottom: 1rem;">The environment settings are isolated to prevent hardcoded credentials. Configurations are instantiated as an immutable, frozen dataclass singleton representing the system state:</p>
+                    
+                    <div class="sub-section-title">Immutable State Pattern Implementation</div>
+                    <p style="margin-bottom: 1rem;">To protect settings from memory injection or unintended modification during hot execution runtime, the configuration is parsed into a read-only frozen dataclass singleton:</p>
                     <pre class="code-snippet">@dataclass(frozen=True)
 class Config:
-    mode: str = os.getenv("ONEGUARD_MODE", "sandbox")
-    api_key: str = os.getenv("BINANCE_API_KEY", "")
-    secret_key: str = os.getenv("BINANCE_SECRET_KEY", "")
-    emergency_halt: bool = os.getenv("EMERGENCY_HALT", "FALSE") == "TRUE"</pre>
+    mode: str          # Must resolve strictly to 'sandbox' or 'live'
+    api_key: str       # Exchange API key
+    secret_key: str    # Exchange Secret key
+    telegram_token: str
+    telegram_chat_id: str
+    emergency_halt: bool # Instantly kills execution loops when TRUE</pre>
                 `,
                 guardrails: `
                     <div class="warning-box">
-                        <div class="warning-box-title">🚨 Credentials Security Rules</div>
-                        <p>Our credentials loader verifies that API keys are completely isolated from version control. <code>.gitignore</code> explicitly bans <code>.env</code>. The loader halts live runs immediately if settings are unstable or set to incorrect modes.</p>
+                        <div class="warning-box-title">🛡️ Secret Key & File-Leaks Prevention</div>
+                        <p>Our <code>.gitignore</code> explicitly bans <code>.env</code>, local databases (<code>*.db</code>), diagnostic logs (<code>*.log</code>), and caches (<code>__pycache__/</code>). This ensures credential leaks to version control repositories remain structurally impossible.</p>
                     </div>
-                    <h3>Important things to watch out for:</h3>
+
+                    <div class="sub-section-title">Critical Guidelines & Diagnostics</div>
                     <ul class="modal-list">
-                        <li><strong>Local Mode Switch</strong>: Verify <code>ONEGUARD_MODE</code> is explicitly defined to prevent live execution defaults.</li>
-                        <li><strong>Emergency Halt</strong>: Setting <code>EMERGENCY_HALT=TRUE</code> in <code>.env</code> suspends all loops instantly.</li>
+                        <li><strong>Execution Sandbox Policy</strong>: Always check the active mode parameter in <code>.env</code>. The default mode must resolve strictly to <code>sandbox</code> to avoid deploying live funds during developer cycles.</li>
+                        <li><strong>Config Initialization Assertion</strong>: The loader parses mode strings case-insensitively and throws raw assertions if settings are missing or misconfigured, halting the bot before exchange instantiation.</li>
+                        <li><strong>Emergency Override Switch</strong>: Toggling <code>EMERGENCY_HALT=TRUE</code> acts as a hard physical switch, instantly throwing system exit signals across all runner loops.</li>
                     </ul>
                 `
             },
             phase2: {
                 title: "Phase 2: Ingestion & Indicators",
-                subtitle: "Real-time pipeline operations, database management, and indicator calculations",
+                subtitle: "Exchange connection logic, high-performance database setup, and technical indicator engine",
                 overview: `
-                    <h3>What we have done:</h3>
-                    <ul class="modal-list" style="margin-top: 0.75rem;">
-                        <li><strong>CCXT Client Config</strong>: Configured exchange connections dynamically initializing public/private wrappers with automatic sandbox controls and built-in rate-limiting queues.</li>
-                        <li><strong>SQLite Database Management</strong>: Developed <code>src/db.py</code> using WAL journal modes to handle atomic reads/writes under database connection thread isolation.</li>
-                        <li><strong>Mathematical Calculation Module</strong>: Created <code>src/indicators.py</code> calling <code>pandas-ta</code> to calculate RSI (14), EMA (9/21), and Bollinger Bands (20, 2).</li>
-                        <li><strong>Cron Scheduler Ingestion</strong>: Completed <code>src/pipeline.py</code> which polls candles and updates historical states continuously on 15-minute cycles.</li>
+                    <div class="sub-section-title">Completed Milestones</div>
+                    <ul class="modal-list">
+                        <li><strong>Exchange Client Ingestion (CCXT)</strong>: Initialized the <code>ccxt</code> Binance driver. Programmed automatic testnet routing that queries the Binance Sandbox if sandbox mode is toggled, protecting live assets.</li>
+                        <li><strong>Latency & Clock Diagnostics</strong>: Built <code>src/connection_test.py</code> to request time from the exchange, testing network latency and verifying clock offsets.</li>
+                        <li><strong>High-Performance Local Cache (WAL Mode)</strong>: Configured SQLite database <code>one_guard_trading.db</code> inside <code>src/db.py</code> using Write-Ahead Logging (WAL) to support non-blocking reading from our dashboard.</li>
+                        <li><strong>Pandas-TA Calculation Pipeline</strong>: Integrated <code>pandas-ta</code> in <code>src/indicators.py</code>, computing RSI (14), Fast EMA (9), Slow EMA (21), and Bollinger Bands (20, 2) from raw historical price data.</li>
+                        <li><strong>Automated Cron Scheduler Loops</strong>: Coded a recurring execution system in <code>src/pipeline.py</code> using <code>APScheduler</code> to query Binance, process indicator matrices, and persist data at exact 15-minute intervals.</li>
                     </ul>
                 `,
                 tech: `
-                    <h3>Technology Implementation Details:</h3>
-                    <div class="tech-pill-container" style="margin-top: 0.75rem;">
-                        <span class="tech-pill">ccxt 4.5+</span>
-                        <span class="tech-pill">sqlite3 WAL</span>
-                        <span class="tech-pill">pandas-ta</span>
-                        <span class="tech-pill">APScheduler</span>
+                    <div class="sub-section-title">Core Technologies Installed & Utilized</div>
+                    <div class="tech-pill-container">
+                        <span class="tech-pill">ccxt 4.5.x</span>
+                        <span class="tech-pill">SQLite3 WAL</span>
+                        <span class="tech-pill">pandas-ta 0.3.x</span>
+                        <span class="tech-pill">APScheduler 3.10.x</span>
                     </div>
-                    <p style="margin-bottom: 1rem;">To guarantee clean indicator calculations, the pipeline pulls the last 100 historical candles, writes them into SQLite using composite upsert index mapping, queries them back chronologically, and appends calculations:</p>
-                    <pre class="code-snippet"># WAL (Write-Ahead Logging) Performance Config
+
+                    <div class="sub-section-title">CCXT Client Config & Rate Limit Engine</div>
+                    <p style="margin-bottom: 0.5rem;">CCXT is configured to automatically parse request limits and prevent client-side IP bans by queuing exchange hits. In addition, API routing handles sandbox redirection safely:</p>
+                    <pre class="code-snippet"># Instantiated client properties
+exchange = getattr(ccxt, "binance")({
+    'enableRateLimit': True,  # Automatically queue to avoid IP ban
+    'timeout': 15000,         # Reject frozen requests after 15s
+    'apiKey': settings.api_key,
+    'secret': settings.secret_key
+})
+if settings.mode == "sandbox":
+    exchange.set_sandbox_mode(True)  # Strictly targets Binance Testnet</pre>
+
+                    <div class="sub-section-title">High-Performance Database WAL Configuration</div>
+                    <p style="margin-bottom: 0.5rem;">To optimize data updates, the database is opened with concurrent WAL journaling. We enforce composite keys to upsert candles without duplication:</p>
+                    <pre class="code-snippet"># WAL configuration enabling multi-process reads/writes
 cursor.execute("PRAGMA journal_mode=WAL;")
-# Composite Index for Upserts
+# Composite indexes for atomic upsert overrides
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS candles (
         symbol TEXT, timestamp INTEGER,
-        open REAL, close REAL, ...
-        UNIQUE(symbol, timestamp) ON CONFLICT REPLACE
+        open REAL, high REAL, low REAL, close REAL, volume REAL,
+        PRIMARY KEY (symbol, timestamp)
     );
 """)</pre>
                 `,
                 guardrails: `
                     <div class="warning-box">
-                        <div class="warning-box-title">⏳ Signature Offset Sync Drift</div>
-                        <p>Binance API will reject calls if the timestamp offset between your VPS/local clock and their servers exceeds 1000ms. We fetch exchange time dynamically to measure offset offsets:</p>
+                        <div class="warning-box-title">⏰ Clock Sync Offset Threshold (1000ms)</div>
+                        <p>Binance security enforces strict request signature validation windows. If your local system clock drifts by more than 1000ms compared to the Binance server time, all requests fail with a timestamp error. Our connection test runs latency diagnostics to warn us if offset is unsafe.</p>
                     </div>
-                    <h3>Technical limits to monitor:</h3>
+
+                    <div class="sub-section-title">Technical Limits to Watch Out For</div>
                     <ul class="modal-list">
-                        <li><strong>API Throttling Limits</strong>: CCXT uses an internal scheduler (<code>enableRateLimit: true</code>) to stay within the 1200 weight limit. Avoid spamming manual requests.</li>
-                        <li><strong>Database Lock Timeouts</strong>: High-frequency pipeline operations utilize a <code>10.0s</code> connection timeout threshold to prevent write locks.</li>
+                        <li><strong>Exchange Rate Weight Limit</strong>: Binance restricts connections via a sliding weight system (1200 weight-points per minute). Our scheduler fetches only the last 100 candles per 15-minute interval, cacheing results locally in SQLite to restrict external hits.</li>
+                        <li><strong>SQLite Timeout Lockout Safeguard</strong>: Concurrent write operations from the execution runner can lock SQLite tables. We configure our DB connections with a <code>timeout=10.0</code> parameter to prevent sudden query lockout crashes.</li>
+                        <li><strong>Indicators Lookback Requirements</strong>: Technical indicator calculation engines (like EMA and Bollinger Bands) require a minimum sequence history to normalize. We pull a 100-candle lookback history to ensure the latest RSI and Bollinger values are correct.</li>
                     </ul>
                 `
             },
             phase3: {
                 title: "Phase 3: Core Logic & Risk Engine",
-                subtitle: "Position sizing algorithms, trade signal triggers, and execution controllers",
+                subtitle: "Risk management controllers, order routing wrappers, and trading signal strategies",
                 overview: `
-                    <h3>Planned Tasks & Current Work:</h3>
-                    <ul class="modal-list" style="margin-top: 0.75rem;">
-                        <li><strong>Position Sizer (<code>src/risk.py</code>)</strong>: Formulate formulas calculating order volumes dynamically based on maximum drawdown caps and capital risk constraints.</li>
-                        <li><strong>Order Routers</strong>: Write order placing hooks mapping safety stop-loss (SL) triggers and profit-taking targets.</li>
-                        <li><strong>Strategy Rules (<code>src/strategies/rsi_bb.py</code>)</strong>: Translate indicator parameters into structural trade entry / exit decisions.</li>
-                        <li><strong>Automated Execution Core</strong>: Build the primary controller joining the pipeline scheduler with the risk engine.</li>
+                    <div class="sub-section-title">Target Features & Current Work</div>
+                    <ul class="modal-list">
+                        <li><strong>Capital Sizing Engine (<code>src/risk.py</code>)</strong>: Implement formulas to calculate the exact order size (trade allocation) based on active balance constraints, and a maximum risk limit (1.5% - 2%) per trade.</li>
+                        <li><strong>Order Managers & Routers</strong>: Write order routing templates to submit buy/sell limit orders and attach stop-loss (SL) and take-profit (TP) levels.</li>
+                        <li><strong>Technical Signal Strategy (<code>src/strategies/rsi_bb.py</code>)</strong>: Translate indicators into trading signals: BUY when RSI < 30 and price is near lower Bollinger Band; SELL when RSI > 70 or price breaks upper Bollinger Band.</li>
+                        <li><strong>Primary Controller Core</strong>: Connect our database pipeline scheduler, indicator trigger loops, and trade routers into a unified execution thread.</li>
                     </ul>
                 `,
                 tech: `
-                    <h3>Technology Architecture (Planned):</h3>
-                    <div class="tech-pill-container" style="margin-top: 0.75rem;">
-                        <span class="tech-pill">NumPy Sizing</span>
-                        <span class="tech-pill">ccxt private orders</span>
-                        <span class="tech-pill">Signal Routing</span>
+                    <div class="sub-section-title">Target Architecture Schema</div>
+                    <div class="tech-pill-container">
+                        <span class="tech-pill">Position Sizing</span>
+                        <span class="tech-pill">Order Routing</span>
+                        <span class="tech-pill">Signaling Engine</span>
                     </div>
-                    <p>The risk controller acts as the gatekeeper. No order is dispatched without validating structural parameter filters:</p>
-                    <pre class="code-snippet">def check_safety_constraints(position_size, balance):
-    # Enforce strict maximum trade sizes (e.g. 2%)
-    assert position_size <= balance * 0.02, "Risk Limit Exceeded"
-    # Enforce stop-loss boundaries
-    assert stop_loss_price is not None, "SL must be set"</pre>
+                    <p style="margin-bottom: 0.5rem;">The Risk Manager serves as our primary safety valve. Every calculated signal must pass through strict constraints before an order is placed:</p>
+                    <pre class="code-snippet">def validate_trade_risk(balance, target_price, stop_loss_price):
+    # Maximum risk of total account balance is hard-capped (e.g. 2%)
+    max_risk_amount = balance * 0.02
+    risk_per_unit = abs(target_price - stop_loss_price)
+    position_size = max_risk_amount / risk_per_unit
+    return position_size</pre>
                 `,
                 guardrails: `
                     <div class="warning-box" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3);">
                         <div class="warning-box-title" style="color: #ef4444;">🛡️ Strict Drawdown Protection Policy</div>
-                        <p>The Risk Engine enforces a hard stop at 8% weekly drawdown. Realized PnL is summarized from local logs, and the bot will suspend operations automatically if the limit is violated.</p>
+                        <p>The Risk Engine will enforce a hard halt if our weekly drawdown reaches 8.0%. In addition, we will always test strategy iterations on the Binance Sandbox Testnet using mock funds before live deployment.</p>
                     </div>
-                    <h3>Guidelines during development:</h3>
+
+                    <div class="sub-section-title">Critical Safety Measures</div>
                     <ul class="modal-list">
-                        <li><strong>Paper Trading Validation</strong>: Test all logic flows using Binance Testnet. Real money is forbidden in Phase 3.</li>
-                        <li><strong>Order Slippage Allowances</strong>: Configure strict market limit orders instead of raw market orders to prevent slippage losses.</li>
+                        <li><strong>Order Slippage Protections</strong>: Avoid raw market orders on lower-liquidity pairs. Always submit limit orders with calculated slippage thresholds.</li>
+                        <li><strong>Position Lockouts</strong>: Limit execution threads to one active trade per symbol at a time to prevent duplicate entry signals.</li>
                     </ul>
                 `
             },
             phase4: {
                 title: "Phase 4: Telemetry & Dashboard",
-                subtitle: "Streamlit UI analytics, Telegram alerting handlers, and performance metrics",
+                subtitle: "Real-time analytics UI dashboard, notification alert integrations, and performance reporting",
                 overview: `
-                    <h3>Planned Tasks & Current Work:</h3>
-                    <ul class="modal-list" style="margin-top: 0.75rem;">
-                        <li><strong>Telegram Bot Telemetry</strong>: Establish bot notification clients that alert you instantly of trade events, execution confirmations, and system errors.</li>
-                        <li><strong>Streamlit Dashboard</strong>: Build an interactive, light-weight local web page showing active balances, database charts, trade histories, and state configurations.</li>
-                        <li><strong>Performance Analytics</strong>: Implement compounding logs, win-rate analytics, and win-to-loss factors.</li>
+                    <div class="sub-section-title">Target Features & Current Work</div>
+                    <ul class="modal-list">
+                        <li><strong>Telegram Bot Alerting Client</strong>: Build message queues that send instant push alerts to your phone whenever trades are entered, stopped out, or if the bot encounters a system error.</li>
+                        <li><strong>Interactive Streamlit UI Dashboard</strong>: Create a web UI displaying active metrics, trade logs, historical balance curves, and current configurations.</li>
+                        <li><strong>Analytics Summaries</strong>: Formulate math helper functions to calculate bot performance statistics (win rate %, average profit/loss, maximum run drawdown).</li>
                     </ul>
                 `,
                 tech: `
-                    <h3>Technology Architecture (Planned):</h3>
-                    <div class="tech-pill-container" style="margin-top: 0.75rem;">
-                        <span class="tech-pill">Streamlit</span>
-                        <span class="tech-pill">Plotly charts</span>
-                        <span class="tech-pill">requests / Telegram Bot API</span>
+                    <div class="sub-section-title">Target Architecture Schema</div>
+                    <div class="tech-pill-container">
+                        <span class="tech-pill">Streamlit UI</span>
+                        <span class="tech-pill">Plotly Charting</span>
+                        <span class="tech-pill">Telegram Bot API</span>
                     </div>
-                    <p>Streamlit is selected for its high performance and visual integration. It queries the local database files directly, bypassing complex web API construction.</p>
+                    <p style="margin-bottom: 0.5rem;">We will use Streamlit because it is fast, lightweight, and can query our SQLite database directly without the overhead of building a separate REST API:</p>
+                    <pre class="code-snippet"># Streamlit SQLite Query Pattern (Read-only)
+conn = sqlite3.connect("one_guard_trading.db", check_same_thread=False)
+df_candles = pd.read_sql_query("SELECT * FROM candles", conn)</pre>
                 `,
                 guardrails: `
                     <div class="warning-box">
                         <div class="warning-box-title">📢 Telemetry Thread Isolation</div>
-                        <p>Notifications are dispatched inside async handler loops. If Telegram API servers fail or respond slowly, it must never block the main trade execution pipeline scheduler loop.</p>
+                        <p>All Telegram alerts must run asynchronously on separate threads or via non-blocking queues. If the Telegram servers respond slowly or experience an outage, it must never stall the primary trading execution loops.</p>
                     </div>
-                    <h3>Important considerations:</h3>
+
+                    <div class="sub-section-title">Technical Warnings</div>
                     <ul class="modal-list">
-                        <li><strong>Token Encryption</strong>: Telemetry chat IDs and tokens are fully decoupled via <code>.env</code>.</li>
-                        <li><strong>Read-only DB Access</strong>: Streamlit queries the SQLite database in read-only mode to prevent write conflicts or accidental mutations.</li>
+                        <li><strong>Secure Configurations</strong>: Bot tokens and Chat IDs are loaded from our secure environment variables, never hardcoded in the codebase.</li>
+                        <li><strong>Read-Only Database Locking Prevention</strong>: The Streamlit dashboard opens SQLite connections with read-only flags (<code>query_mode</code>) to prevent write-lock conflicts with the trading engine.</li>
                     </ul>
                 `
             }
@@ -1174,15 +1214,12 @@ cursor.execute("""
 
         // Switch Tabs inside Modal
         function switchModalTab(tabName) {
-            // Update active tab button style
             const tabButtons = document.querySelectorAll('.modal-tab-btn');
             tabButtons.forEach(btn => btn.classList.remove('active'));
             
-            // Find active tab button by onclick parameter matching the tabName
             const activeBtn = Array.from(tabButtons).find(btn => btn.getAttribute('onclick').includes(tabName));
             if (activeBtn) activeBtn.classList.add('active');
 
-            // Inject the corresponding content
             const contentContainer = document.getElementById('modal-body-content');
             const data = phaseData[currentActivePhase];
             
