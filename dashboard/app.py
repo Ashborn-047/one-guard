@@ -174,19 +174,6 @@ def main():
     st.sidebar.subheader("Dashboard Controls")
     refresh_rate = st.sidebar.selectbox("Auto Refresh Rate", ["Manual", "10 seconds", "30 seconds", "60 seconds"], index=2)
     
-    # Handle refresh timing
-    refresh_seconds = 0
-    if refresh_rate == "10 seconds":
-        refresh_seconds = 10
-    elif refresh_rate == "30 seconds":
-        refresh_seconds = 30
-    elif refresh_rate == "60 seconds":
-        refresh_seconds = 60
-        
-    if refresh_seconds > 0:
-        time.sleep(refresh_seconds)
-        st.rerun()
-        
     if st.sidebar.button("Force Refresh Now 🔄"):
         st.rerun()
 
@@ -489,6 +476,19 @@ def main():
             )
     except Exception as e:
         st.error(f"Failed to query trade ledger: {e}")
+
+    # Handle refresh timing at the end of main() to ensure the page renders fully before sleeping
+    refresh_seconds = 0
+    if refresh_rate == "10 seconds":
+        refresh_seconds = 10
+    elif refresh_rate == "30 seconds":
+        refresh_seconds = 30
+    elif refresh_rate == "60 seconds":
+        refresh_seconds = 60
+        
+    if refresh_seconds > 0:
+        time.sleep(refresh_seconds)
+        st.rerun()
 
 if __name__ == "__main__":
     main()
