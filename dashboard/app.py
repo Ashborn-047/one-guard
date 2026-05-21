@@ -1,3 +1,9 @@
+import os
+import sys
+
+# Add project root to path to resolve src imports correctly when executing directly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sqlite3
 import time
 import datetime
