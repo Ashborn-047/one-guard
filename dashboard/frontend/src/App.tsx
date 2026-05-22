@@ -93,6 +93,7 @@ export default function App() {
   const [refreshRate, setRefreshRate] = useState<string>('30 seconds');
   const [candleCount, setCandleCount] = useState<number>(100);
   const [forceTrigger, setForceTrigger] = useState<number>(0);
+  const [symbols, setSymbols] = useState<string[]>(['BTC/USDT', 'ETH/USDT']);
 
   // Overlay Toggles
   const [showEma, setShowEma] = useState<boolean>(true);
@@ -107,6 +108,126 @@ export default function App() {
   const [chartData, setChartData] = useState<ChartData | null>(null);
   
   const [error, setError] = useState<string | null>(null);
+
+  // Interactive settings state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editValues, setEditValues] = useState({
+    max_position_size: 0,
+    max_open_trades: 0,
+    weekly_drawdown_limit: 0,
+    loss_cooldown_minutes: 0
+  });
+
+  const showToastMessage = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+  };
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const fetchSymbols = async () => {
+    try {
+      const res = await fetch('/api/symbols');
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setSymbols(data);
+        if (!data.includes(selectedPair)) {
+          setSelectedPair(data[0]);
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching symbols:', e);
+    }
+  };
+
+  const handleToggleExecutionMode = async () => {
+    if (!status) return;
+    const newIsLive = !status.is_live;
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_live: newIsLive })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setStatus(data.settings);
+        showToastMessage(`Switched execution mode to ${newIsLive ? 'LIVE TRADING' : 'SANDBOX MOCK'}`, 'success');
+      } else {
+        showToastMessage(data.message || 'Failed to update execution mode', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      showToastMessage('Failed to update execution mode due to network error', 'error');
+    }
+  };
+
+  const handleToggleEmergencyHalt = async () => {
+    if (!status) return;
+    const newHalt = !status.emergency_halt;
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emergency_halt: newHalt })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setStatus(data.settings);
+        showToastMessage(newHalt ? 'EMERGENCY HALT ACTIVATED!' : 'Emergency halt deactivated.', newHalt ? 'error' : 'success');
+      } else {
+        showToastMessage(data.message || 'Failed to toggle emergency halt', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      showToastMessage('Failed to toggle emergency halt due to network error', 'error');
+    }
+  };
+
+  const startEditing = () => {
+    if (!status) return;
+    setEditValues({
+      max_position_size: status.max_position_size,
+      max_open_trades: status.max_open_trades,
+      weekly_drawdown_limit: status.weekly_drawdown_limit,
+      loss_cooldown_minutes: status.loss_cooldown_minutes
+    });
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+  };
+
+  const saveSettings = async () => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editValues)
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setStatus(data.settings);
+        setIsEditing(false);
+        showToastMessage('Risk guardrail settings updated successfully', 'success');
+      } else {
+        showToastMessage(data.message || 'Failed to update settings', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      showToastMessage('Network error while saving settings', 'error');
+    }
+  };
+
+  useEffect(() => {
+    fetchSymbols();
+  }, []);
 
   // Chart References
   const mainChartContainerRef = useRef<HTMLDivElement>(null);
@@ -333,7 +454,11 @@ export default function App() {
     return () => {
       window.removeEventListener('resize', handleResize);
       mainChart.remove();
-      if (rsiChart) rsiChart.remove();
+      mainChartRef.current = null;
+      if (rsiChart) {
+        rsiChart.remove();
+        rsiChartRef.current = null;
+      }
     };
   }, [chartData, showEma, showBb, showRsi]);
 
@@ -365,7 +490,7 @@ export default function App() {
         <div className="sidebar-group">
           <h3 className="sidebar-title">System Configuration</h3>
           
-          <div className="status-badge" id="execution-mode-badge">
+          <div className="status-badge clickable" id="execution-mode-badge" onClick={handleToggleExecutionMode} title="Click to toggle execution mode">
             <span className="badge-label">Execution Mode</span>
             {status ? (
               <span className={`badge-value ${status.is_live ? 'red' : 'orange'}`}>
@@ -377,7 +502,7 @@ export default function App() {
             )}
           </div>
 
-          <div className="status-badge" id="emergency-halt-badge">
+          <div className="status-badge clickable" id="emergency-halt-badge" onClick={handleToggleEmergencyHalt} title="Click to toggle Emergency Halt">
             <span className="badge-label">Emergency Guard</span>
             {status ? (
               <span className={`badge-value ${status.emergency_halt ? 'red' : 'green'}`}>
@@ -421,33 +546,130 @@ export default function App() {
 
         {/* Risk Guardrails settings display */}
         <div className="sidebar-group" style={{ marginTop: 'auto' }}>
-          <h3 className="sidebar-title">Risk Guardrails</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="sidebar-title" style={{ marginBottom: 0 }}>Risk Guardrails</h3>
+            {!isEditing && status && (
+              <button 
+                onClick={startEditing} 
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: 'var(--color-accent)', 
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '12px',
+                  fontWeight: 600
+                }}
+              >
+                <Settings size={12} /> Edit
+              </button>
+            )}
+          </div>
           <div className="risk-list" id="risk-guardrails-list">
             <div className="risk-item">
               <span className="risk-label">Max Position Size</span>
-              <span className="risk-val">{status ? `${status.max_position_size} USDT` : '-'}</span>
+              {isEditing ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="number"
+                    className="risk-input"
+                    value={editValues.max_position_size}
+                    onChange={(e) => setEditValues({ ...editValues, max_position_size: parseFloat(e.target.value) || 0 })}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>USDT</span>
+                </div>
+              ) : (
+                <span className="risk-val">{status ? `${status.max_position_size} USDT` : '-'}</span>
+              )}
             </div>
             <div className="risk-item">
               <span className="risk-label">Max Open Trades</span>
-              <span className="risk-val">{status ? status.max_open_trades : '-'}</span>
+              {isEditing ? (
+                <input
+                  type="number"
+                  className="risk-input"
+                  value={editValues.max_open_trades}
+                  onChange={(e) => setEditValues({ ...editValues, max_open_trades: parseInt(e.target.value) || 0 })}
+                />
+              ) : (
+                <span className="risk-val">{status ? status.max_open_trades : '-'}</span>
+              )}
             </div>
             <div className="risk-item">
               <span className="risk-label">Weekly PnL Limit</span>
-              <span className="risk-val">{status ? `${status.weekly_drawdown_limit} USDT` : '-'}</span>
+              {isEditing ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="number"
+                    className="risk-input"
+                    value={editValues.weekly_drawdown_limit}
+                    onChange={(e) => setEditValues({ ...editValues, weekly_drawdown_limit: parseFloat(e.target.value) || 0 })}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>USDT</span>
+                </div>
+              ) : (
+                <span className="risk-val">{status ? `${status.weekly_drawdown_limit} USDT` : '-'}</span>
+              )}
             </div>
             <div className="risk-item">
               <span className="risk-label">Loss Cooldown</span>
-              <span className="risk-val">{status ? `${status.loss_cooldown_minutes}m` : '-'}</span>
+              {isEditing ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="number"
+                    className="risk-input"
+                    value={editValues.loss_cooldown_minutes}
+                    onChange={(e) => setEditValues({ ...editValues, loss_cooldown_minutes: parseInt(e.target.value) || 0 })}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>m</span>
+                </div>
+              ) : (
+                <span className="risk-val">{status ? `${status.loss_cooldown_minutes}m` : '-'}</span>
+              )}
             </div>
             <div className="risk-item">
               <span className="risk-label">Stop Loss Target</span>
-              <span className="risk-val">{status ? `${status.stop_loss_target}%` : '-'}</span>
+              <span className="risk-val" style={{ opacity: 0.6 }}>{status ? `${status.stop_loss_target}%` : '-'}</span>
             </div>
             <div className="risk-item">
               <span className="risk-label">Take Profit Target</span>
-              <span className="risk-val">{status ? `${status.take_profit_target}%` : '-'}</span>
+              <span className="risk-val" style={{ opacity: 0.6 }}>{status ? `${status.take_profit_target}%` : '-'}</span>
             </div>
           </div>
+          {isEditing && (
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <button 
+                onClick={saveSettings}
+                className="action-btn"
+                style={{ 
+                  flex: 1, 
+                  padding: '6px 12px', 
+                  fontSize: '12px', 
+                  background: 'rgba(63, 185, 80, 0.1)',
+                  borderColor: 'rgba(63, 185, 80, 0.3)',
+                  color: 'var(--color-green)'
+                }}
+              >
+                Save
+              </button>
+              <button 
+                onClick={cancelEditing}
+                className="action-btn"
+                style={{ 
+                  flex: 1, 
+                  padding: '6px 12px', 
+                  fontSize: '12px', 
+                  background: 'rgba(248, 81, 73, 0.1)',
+                  borderColor: 'rgba(248, 81, 73, 0.3)',
+                  color: 'var(--color-red)'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -668,8 +890,9 @@ export default function App() {
                     value={selectedPair}
                     onChange={(e) => setSelectedPair(e.target.value)}
                   >
-                    <option value="BTC/USDT">BTC/USDT</option>
-                    <option value="ETH/USDT">ETH/USDT</option>
+                    {symbols.map(sym => (
+                      <option key={sym} value={sym}>{sym}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -848,6 +1071,45 @@ export default function App() {
         </section>
         
       </main>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            className={`toast toast-${toast.type}`}
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              zIndex: 9999,
+              padding: '12px 20px',
+              borderRadius: '8px',
+              background: toast.type === 'success' 
+                ? 'rgba(63, 185, 80, 0.95)' 
+                : toast.type === 'error' 
+                ? 'rgba(248, 81, 73, 0.95)' 
+                : 'rgba(88, 166, 255, 0.95)',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: '14px',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            {toast.type === 'success' && <ShieldCheck size={16} />}
+            {toast.type === 'error' && <ShieldAlert size={16} />}
+            {toast.type === 'info' && <RefreshCw size={16} />}
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

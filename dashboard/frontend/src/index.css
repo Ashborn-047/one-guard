@@ -168,6 +168,35 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
+.status-badge.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-badge.clickable:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.risk-input {
+  width: 90px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-align: right;
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.risk-input:focus {
+  border-color: var(--color-accent);
+}
+
 .badge-label {
   font-size: 13px;
   color: var(--text-secondary);

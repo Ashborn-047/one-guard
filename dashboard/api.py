@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import logging
 from typing import Dict, Any, List, Optional
 import ccxt
@@ -278,11 +279,137 @@ def read_chart(symbol: str = "BTC/USDT", limit: int = Query(100, ge=10, le=500))
         }
     }
 
+# Keep track of the last time we synced trades for each symbol to prevent rate limits
+_last_trade_sync_time: Dict[str, float] = {}
+
+def sync_exchange_trades():
+    """
+    Synchronizes trades from the exchange into our local database.
+    Only runs if API credentials are set and limits sync per symbol to once every 30 seconds.
+    """
+    global _last_trade_sync_time
+    
+    # Check if exchange API keys are present
+    if not settings.api_key or not settings.secret_key:
+        logger.info("Exchange sync skipped: API credentials are not configured.")
+        return
+
+    exchange = get_exchange_client()
+    if not exchange:
+        logger.error("Exchange sync failed: could not initialize exchange client.")
+        return
+
+    # Get symbols to sync
+    symbols = read_symbols()
+    now = time.time()
+    
+    for symbol in symbols:
+        # Limit sync rate to once every 30 seconds per symbol
+        last_sync = _last_trade_sync_time.get(symbol, 0.0)
+        if now - last_sync < 30.0:
+            logger.debug(f"Sync for {symbol} skipped: throttled (last sync {now - last_sync:.1f}s ago).")
+            continue
+            
+        logger.info(f"Syncing trades from exchange for symbol: {symbol}...")
+        try:
+            # Update last sync time before call to prevent concurrent requests
+            _last_trade_sync_time[symbol] = now
+            
+            # Fetch trades from exchange
+            raw_trades = exchange.fetch_my_trades(symbol)
+            if not raw_trades:
+                logger.info(f"No trades returned from exchange for {symbol}.")
+                continue
+                
+            # Group trades by Order ID
+            order_trades = {}
+            for t in raw_trades:
+                order_id = t.get('order') or t.get('id')
+                if not order_id:
+                    continue
+                if order_id not in order_trades:
+                    order_trades[order_id] = []
+                order_trades[order_id].append(t)
+                
+            # Aggregate and save trades
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                for order_id, t_list in order_trades.items():
+                    # Check if trade already exists in our database
+                    cursor.execute("SELECT id FROM trades WHERE order_id = ?", (order_id,))
+                    if cursor.fetchone():
+                        continue
+                        
+                    # Sort trades by timestamp ascending
+                    t_list = sorted(t_list, key=lambda x: x.get('timestamp') or 0)
+                    
+                    first_t = t_list[0]
+                    
+                    timestamp = first_t.get('timestamp') or int(time.time() * 1000)
+                    side = first_t.get('side').upper()
+                    
+                    # Calculate totals
+                    total_amount = sum(float(x.get('amount') or 0.0) for x in t_list)
+                    total_cost = sum(float(x.get('cost') or 0.0) for x in t_list)
+                    
+                    # Calculate weighted average price
+                    if total_amount > 0:
+                        avg_price = sum(float(x.get('price') or 0.0) * float(x.get('amount') or 0.0) for x in t_list) / total_amount
+                    else:
+                        avg_price = float(first_t.get('price') or 0.0)
+                        
+                    # Calculate fee cost
+                    total_fee = 0.0
+                    for x in t_list:
+                        fee = x.get('fee')
+                        if fee:
+                            total_fee += float(fee.get('cost') or 0.0)
+                            
+                    # Calculate realized PnL for exits (SELL)
+                    pnl = None
+                    if side == 'SELL':
+                        # Find the preceding BUY trade for this symbol to calculate PnL.
+                        cursor.execute("""
+                            SELECT price, fee FROM trades 
+                            WHERE symbol = ? AND side = 'BUY' 
+                            ORDER BY timestamp DESC LIMIT 1
+                        """, (symbol,))
+                        buy_row = cursor.fetchone()
+                        if buy_row:
+                            entry_price = float(buy_row['price'])
+                            entry_fee = float(buy_row['fee']) if buy_row['fee'] is not None else 0.0
+                            pnl = (avg_price - entry_price) * total_amount - entry_fee - total_fee
+                        else:
+                            pnl = 0.0
+                            
+                    # Insert the aggregated trade log
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO trades (timestamp, symbol, strategy, side, price, amount, cost, fee, pnl, order_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        timestamp,
+                        symbol,
+                        "Exchange Sync",
+                        side,
+                        avg_price,
+                        total_amount,
+                        total_cost,
+                        total_fee,
+                        pnl,
+                        order_id
+                    ))
+                conn.commit()
+            logger.info(f"Successfully synced exchange trades for {symbol}.")
+        except Exception as e:
+            logger.error(f"Error syncing trades from exchange for {symbol}: {e}")
+
 @app.get("/api/trades")
 def read_trades(limit: int = Query(100, ge=1, le=200)):
     """
-    Returns historical trades log.
+    Returns historical trades log, synchronizing with the exchange first if API keys are configured.
     """
+    sync_exchange_trades()
+    
     trades_list = []
     try:
         with get_db_connection() as conn:
@@ -311,3 +438,59 @@ def read_trades(limit: int = Query(100, ge=1, le=200)):
         logger.error(f"Failed to query trades ledger: {e}")
         
     return trades_list
+
+
+from pydantic import BaseModel
+
+class SettingsUpdate(BaseModel):
+    is_live: Optional[bool] = None
+    emergency_halt: Optional[bool] = None
+    max_position_size: Optional[float] = None
+    max_open_trades: Optional[int] = None
+    weekly_drawdown_limit: Optional[float] = None
+    loss_cooldown_minutes: Optional[int] = None
+
+
+@app.get("/api/symbols")
+def read_symbols():
+    """
+    Returns a list of all distinct symbols available in the candles database.
+    """
+    symbols_list = []
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT symbol FROM candles")
+            rows = cursor.fetchall()
+            symbols_list = [row["symbol"] for row in rows]
+    except Exception as e:
+        logger.error(f"Failed to query available symbols: {e}")
+        
+    if not symbols_list:
+        symbols_list = ["BTC/USDT", "ETH/USDT"]
+    return symbols_list
+
+
+@app.post("/api/settings")
+def update_settings(payload: SettingsUpdate):
+    """
+    Updates the system configuration parameters dynamically.
+    """
+    try:
+        if payload.is_live is not None:
+            settings.mode = "live" if payload.is_live else "sandbox"
+        if payload.emergency_halt is not None:
+            settings.emergency_halt = payload.emergency_halt
+        if payload.max_position_size is not None:
+            settings.max_position_size = payload.max_position_size
+        if payload.max_open_trades is not None:
+            settings.max_open_trades = payload.max_open_trades
+        if payload.weekly_drawdown_limit is not None:
+            settings.weekly_drawdown_limit = payload.weekly_drawdown_limit
+        if payload.loss_cooldown_minutes is not None:
+            settings.loss_cooldown_minutes = payload.loss_cooldown_minutes
+        
+        return {"status": "success", "settings": read_status()}
+    except Exception as e:
+        logger.error(f"Failed to update dynamic settings: {e}")
+        return {"status": "error", "message": str(e)}

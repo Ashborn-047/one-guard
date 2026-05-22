@@ -38,13 +38,15 @@ class TestOneGuardRiskAndStrategies(unittest.TestCase):
         
     @classmethod
     def tearDownClass(cls):
-        # Restore original database configuration
-        object.__setattr__(settings, 'db_file', cls.original_db_file)
-        if settings.db_path.exists():
+        # Unlink the test database first while settings is still pointing to it
+        test_db_path = settings.db_path
+        if test_db_path.exists():
             try:
-                settings.db_path.unlink()
+                test_db_path.unlink()
             except PermissionError:
                 pass # SQLite file might be temporarily locked, ignore
+        # Restore original database configuration
+        object.__setattr__(settings, 'db_file', cls.original_db_file)
                 
     def setUp(self):
         # Clear trades table before every test
@@ -255,6 +257,89 @@ class TestOneGuardRiskAndStrategies(unittest.TestCase):
             {"ema_fast": 99.5,  "ema_slow": 100.5}  # Fast crossed below slow
         ])
         self.assertEqual(generate_ema_signal(df_sell), "SELL")
+
+    @patch('dashboard.api.get_exchange_client')
+    @patch('dashboard.api.read_symbols')
+    def test_sync_exchange_trades(self, mock_read_symbols, mock_get_exchange):
+        from dashboard.api import sync_exchange_trades, _last_trade_sync_time
+        
+        # Reset last sync cache
+        _last_trade_sync_time.clear()
+        
+        # 1. No credentials
+        object.__setattr__(settings, 'api_key', '')
+        object.__setattr__(settings, 'secret_key', '')
+        sync_exchange_trades()
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as count FROM trades")
+            self.assertEqual(cursor.fetchone()['count'], 0)
+            
+        # 2. With credentials
+        object.__setattr__(settings, 'api_key', 'test_key')
+        object.__setattr__(settings, 'secret_key', 'test_secret')
+        
+        mock_exchange = MagicMock()
+        mock_get_exchange.return_value = mock_exchange
+        
+        mock_read_symbols.return_value = ["BTC/USDT"]
+        
+        # Setup mock trades
+        mock_exchange.fetch_my_trades.return_value = [
+            {
+                'id': 'trade_1',
+                'order': 'order_buy_1',
+                'timestamp': 1779385948000,
+                'symbol': 'BTC/USDT',
+                'side': 'buy',
+                'price': 60000.0,
+                'amount': 0.002,
+                'cost': 120.0,
+                'fee': {'cost': 0.12, 'currency': 'USDT'}
+            },
+            {
+                'id': 'trade_2',
+                'order': 'order_sell_1',
+                'timestamp': 1779389548000,
+                'symbol': 'BTC/USDT',
+                'side': 'sell',
+                'price': 61000.0,
+                'amount': 0.002,
+                'cost': 122.0,
+                'fee': {'cost': 0.122, 'currency': 'USDT'}
+            }
+        ]
+        
+        sync_exchange_trades()
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT order_id, side, price, amount, cost, fee, pnl, strategy FROM trades ORDER BY timestamp ASC")
+            rows = cursor.fetchall()
+            
+            self.assertEqual(len(rows), 2)
+            
+            # BUY order
+            self.assertEqual(rows[0]['order_id'], 'order_buy_1')
+            self.assertEqual(rows[0]['side'], 'BUY')
+            self.assertEqual(rows[0]['price'], 60000.0)
+            self.assertEqual(rows[0]['amount'], 0.002)
+            self.assertEqual(rows[0]['cost'], 120.0)
+            self.assertEqual(rows[0]['fee'], 0.12)
+            self.assertIsNone(rows[0]['pnl'])
+            self.assertEqual(rows[0]['strategy'], 'Exchange Sync')
+            
+            # SELL order (with PnL)
+            self.assertEqual(rows[1]['order_id'], 'order_sell_1')
+            self.assertEqual(rows[1]['side'], 'SELL')
+            self.assertEqual(rows[1]['price'], 61000.0)
+            self.assertEqual(rows[1]['amount'], 0.002)
+            self.assertEqual(rows[1]['cost'], 122.0)
+            self.assertEqual(rows[1]['fee'], 0.122)
+            # PnL = (61000 - 60000) * 0.002 - 0.12 (buy fee) - 0.122 (sell fee) = 2.0 - 0.242 = 1.758
+            self.assertAlmostEqual(rows[1]['pnl'], 1.758)
+            self.assertEqual(rows[1]['strategy'], 'Exchange Sync')
 
 
 if __name__ == "__main__":

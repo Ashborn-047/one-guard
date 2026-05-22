@@ -95,6 +95,14 @@ def initialize_db() -> bool:
             """)
             
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol_time ON trades(symbol, timestamp DESC);")
+
+            # 4. System Config Table (Stores dynamic configuration settings)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS system_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+            """)
             
             logger.info("Database schemas and indexes initialized successfully.")
             return True
