@@ -762,7 +762,8 @@
             <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/execution.py</span><span class="module-desc">Order routing</span></div>
             <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/telemetry.py</span><span class="module-desc">Telegram alerts</span></div>
             <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/strategies/*</span><span class="module-desc">RSI, BB, EMA signals</span></div>
-            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">dashboard/app.py</span><span class="module-desc">Streamlit UI — active</span></div>
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">dashboard/api.py</span><span class="module-desc">FastAPI Backend — active</span></div>
+            <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">dashboard/frontend</span><span class="module-desc">Vite React UI — active</span></div>
             <div class="module-card"><span class="module-dot dot-live"></span><span class="module-name">src/analytics.py</span><span class="module-desc">PnL reports — active</span></div>
         </div>
 
@@ -924,7 +925,7 @@
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" id="t-p4-2" checked disabled>
-                            <span class="task-text">Build Streamlit web interface showing active positions, PnL, and DB logs.</span>
+                            <span class="task-text">Build FastAPI & Vite React dashboard showing active positions, PnL, and charts.</span>
                         </li>
                         <li class="task-item completed">
                             <input type="checkbox" class="task-checkbox" id="t-p4-3" checked disabled>
@@ -1050,6 +1051,10 @@
                 <div class="log-entry">
                     <span class="log-time">[2026-05-21 21:45]</span>
                     <span class="log-text"><span class="log-tag">[CHARTS]</span> Integrated Plotly interactive Candlestick charts with Bollinger Bands, EMA fast/slow, and RSI indicators inside the dashboard UI. Verified non-blocking read-only WAL database connection patterns.</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">[2026-05-21 23:55]</span>
+                    <span class="log-text"><span class="log-tag">[DASHBOARD]</span> Archived Streamlit, built FastAPI telemetry service and Vite React + TS glassmorphic dashboard featuring TradingView lightweight-charts, EMA/BB/RSI, and framer-motion micro-animations.</span>
                 </div>
             </div>
         </div>
@@ -1255,7 +1260,8 @@ if open_trade["strategy"] != strategy:
                     <div class="sub-section-title">✅ Completed</div>
                     <ul class="modal-list">
                         <li><strong>Telegram Telemetry Module (<code>src/telemetry.py</code>)</strong>: Implemented <code>send_telegram_message()</code> with a 5-second non-blocking timeout, automatic credential validation, and graceful failure logging. Fully integrated into the execution engine.</li>
-                        <li><strong>Streamlit Dashboard (<code>dashboard/app.py</code>)</strong>: Interactive web UI showing active positions, PnL stats, indicator charts, and live trade logs queried directly from SQLite in WAL mode.</li>
+                        <li><strong>FastAPI Telemetry Service (<code>dashboard/api.py</code>)</strong>: High-performance backend providing live endpoints for metrics, status, active positions, trades, and chart candle history.</li>
+                        <li><strong>Vite React Dashboard (<code>dashboard/frontend</code>)</strong>: Clean, modern glassmorphic dashboard showcasing real-time TradingView charting with overlays (Bollinger Bands, EMA Fast/Slow, RSI pane) and responsive layouts.</li>
                         <li><strong>Performance Analytics Engine</strong>: Integrated calculations for win rate %, profit factor, gross profit/loss, and total trades directly into the dashboard.</li>
                     </ul>
                 `,
@@ -1263,10 +1269,13 @@ if open_trade["strategy"] != strategy:
                     <div class="sub-section-title">Modules Implemented</div>
                     <div class="tech-pill-container">
                         <span class="tech-pill">src/telemetry.py ✅</span>
-                        <span class="tech-pill">dashboard/app.py ✅</span>
+                        <span class="tech-pill">dashboard/api.py ✅</span>
+                        <span class="tech-pill">dashboard/frontend ✅</span>
                         <span class="tech-pill">Telegram Bot API ✅</span>
-                        <span class="tech-pill">Streamlit Web UI ✅</span>
-                        <span class="tech-pill">Plotly Interactive Charting ✅</span>
+                        <span class="tech-pill">FastAPI / Uvicorn ✅</span>
+                        <span class="tech-pill">Vite React + TS ✅</span>
+                        <span class="tech-pill">Lightweight Charts ✅</span>
+                        <span class="tech-pill">Framer Motion ✅</span>
                     </div>
                     <p style="margin-bottom: 0.5rem;">The Telegram module is designed to be a thin, fire-and-forget wrapper. It uses a hard 5-second HTTP timeout to ensure exchange execution is never blocked by network delays:</p>
                     <pre class="code-snippet"># src/telemetry.py — non-blocking safe call pattern
@@ -1279,10 +1288,13 @@ def send_telegram_message(message: str) -> bool:
     except Exception as e:
         logger.error(f"Telegram failed silently: {e}")
         return False  # Bot keeps running regardless</pre>
-                    <p style="margin-bottom: 0.5rem; margin-top: 1rem;">Planned Streamlit query pattern (read-only, WAL-safe):</p>
-                    <pre class="code-snippet"># dashboard/app.py — read-only SQLite query
-conn = sqlite3.connect("one_guard_trading.db", check_same_thread=False)
-df_trades = pd.read_sql_query("SELECT * FROM trades ORDER BY timestamp DESC LIMIT 50", conn)</pre>
+                    <p style="margin-bottom: 0.5rem; margin-top: 1rem;">FastAPI SQLite WAL query pattern:</p>
+                    <pre class="code-snippet"># dashboard/api.py — FastAPI endpoint serving JSON metrics
+@app.get("/api/metrics")
+def read_metrics():
+    perf = get_performance_metrics()
+    weekly_pnl = get_weekly_pnl()
+    return { ... }</pre>
                 `,
                 guardrails: `
                     <div class="warning-box">
@@ -1293,7 +1305,7 @@ df_trades = pd.read_sql_query("SELECT * FROM trades ORDER BY timestamp DESC LIMI
                     <div class="sub-section-title">Design Rules & Technical Warnings</div>
                     <ul class="modal-list">
                         <li><strong>Credential Security</strong>: <code>TELEGRAM_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> are loaded exclusively from the untracked <code>.env</code> file — never hardcoded anywhere in the codebase.</li>
-                        <li><strong>WAL Read Safety</strong>: The Streamlit dashboard will open SQLite in WAL read-only mode. This prevents write-lock conflicts with the trading engine's concurrent write operations on the same file.</li>
+                        <li><strong>WAL Read Safety</strong>: The FastAPI backend opens SQLite connections in WAL autocommit mode with a 10s busy timeout, ensuring safe concurrent reads/writes with the core bot thread.</li>
                         <li><strong>Sandbox Testing First</strong>: All Telegram alert triggers must be verified against a test chat before wiring into the live trading loop.</li>
                     </ul>
                 `
