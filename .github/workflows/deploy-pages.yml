@@ -5,16 +5,15 @@ on:
     branches:
       - main
     paths:
-      - 'dashboard/frontend/**'
-      - '.github/workflows/deploy-pages.yml'
+      - dashboard/frontend/**
+      - .github/workflows/deploy-pages.yml
   workflow_dispatch: {}
-
-permissions:
-  contents: write
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
