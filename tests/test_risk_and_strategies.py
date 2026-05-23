@@ -6,6 +6,7 @@ from typing import Generator
 from unittest.mock import patch, MagicMock
 
 # Import modules to test
+from sqlalchemy import text
 from src.config import settings
 from src.db import initialize_db, log_trade, get_db_connection
 from src.risk import (
@@ -52,10 +53,9 @@ class TestOneGuardRiskAndStrategies(unittest.TestCase):
     def setUp(self):
         # Clear trades table before every test
         with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM trades;")
-            cursor.execute("DELETE FROM candles;")
-            cursor.execute("DELETE FROM indicators;")
+            conn.execute(text("DELETE FROM trades;"))
+            conn.execute(text("DELETE FROM candles;"))
+            conn.execute(text("DELETE FROM indicators;"))
             
         # Reset halt setting
         self.set_emergency_halt(False)
@@ -274,9 +274,9 @@ class TestOneGuardRiskAndStrategies(unittest.TestCase):
         sync_exchange_trades()
         
         with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) as count FROM trades")
-            self.assertEqual(cursor.fetchone()['count'], 0)
+            res = conn.execute(text("SELECT COUNT(*) as count FROM trades"))
+            row = res.mappings().fetchone()
+            self.assertEqual(row['count'], 0)
             
         # 2. With credentials
         object.__setattr__(settings, 'api_key', 'test_key')
@@ -316,9 +316,8 @@ class TestOneGuardRiskAndStrategies(unittest.TestCase):
         sync_exchange_trades()
         
         with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT order_id, side, price, amount, cost, fee, pnl, strategy FROM trades ORDER BY timestamp ASC")
-            rows = cursor.fetchall()
+            res = conn.execute(text("SELECT order_id, side, price, amount, cost, fee, pnl, strategy FROM trades ORDER BY timestamp ASC"))
+            rows = res.mappings().fetchall()
             
             self.assertEqual(len(rows), 2)
             

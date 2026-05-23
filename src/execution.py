@@ -3,6 +3,7 @@ import time
 import traceback
 from typing import Dict, Any, Optional
 import ccxt
+from sqlalchemy import text
 from src.config import settings
 from src.db import get_db_connection, log_trade, log_to_active_trade_file
 from src.risk import (
@@ -121,14 +122,13 @@ def execute_market_order(
             entry_price = None
             try:
                 with get_db_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
+                    res = conn.execute(text("""
                         SELECT price, fee 
                         FROM trades 
-                        WHERE symbol = ? AND side = 'BUY' 
+                        WHERE symbol = :symbol AND side = 'BUY' 
                         ORDER BY timestamp DESC LIMIT 1
-                    """, (symbol,))
-                    row = cursor.fetchone()
+                    """), {"symbol": symbol})
+                    row = res.mappings().fetchone()
                     if row:
                         entry_price = float(row['price'])
                         entry_fee = float(row['fee']) if row['fee'] is not None else 0.0
@@ -208,14 +208,13 @@ def check_and_execute_exits(exchange: ccxt.Exchange):
             entry_price = None
             strategy = "Unknown"
             with get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
+                res = conn.execute(text("""
                     SELECT price, strategy 
                     FROM trades 
-                    WHERE symbol = ? AND side = 'BUY' 
+                    WHERE symbol = :symbol AND side = 'BUY' 
                     ORDER BY timestamp DESC LIMIT 1
-                """, (symbol,))
-                row = cursor.fetchone()
+                """), {"symbol": symbol})
+                row = res.mappings().fetchone()
                 if row:
                     entry_price = float(row['price'])
                     strategy = row['strategy']

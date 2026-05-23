@@ -2,6 +2,7 @@ import logging
 import time
 import datetime
 from typing import Dict, Any, Tuple, Optional
+from sqlalchemy import text
 from src.config import settings
 from src.db import get_db_connection
 
@@ -27,14 +28,13 @@ def get_weekly_pnl() -> float:
     start_ms = get_start_of_week_ms()
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
+            res = conn.execute(text("""
                 SELECT SUM(pnl) as total_pnl 
                 FROM trades 
-                WHERE timestamp >= ? AND pnl IS NOT NULL
-            """, (start_ms,))
-            row = cursor.fetchone()
-            total_pnl = row['total_pnl'] if row and row['total_pnl'] is not None else 0.0
+                WHERE timestamp >= :start_ms AND pnl IS NOT NULL
+            """), {"start_ms": start_ms})
+            row = res.fetchone()
+            total_pnl = row[0] if row and row[0] is not None else 0.0
             return float(total_pnl)
     except Exception as e:
         logger.error(f"Error calculating weekly PnL: {e}")
@@ -49,18 +49,17 @@ def get_active_positions() -> Dict[str, float]:
     positions = {}
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
+            res = conn.execute(text("""
                 SELECT symbol,
                        SUM(CASE WHEN side = 'BUY' THEN amount ELSE -amount END) as net_amount
                 FROM trades
                 GROUP BY symbol
-            """)
-            rows = cursor.fetchall()
+            """))
+            rows = res.fetchall()
             for row in rows:
-                net_amount = float(row['net_amount'])
+                net_amount = float(row[1])
                 if net_amount > EPSILON:
-                    positions[row['symbol']] = net_amount
+                    positions[row[0]] = net_amount
     except Exception as e:
         logger.error(f"Error checking active positions in database: {e}")
     return positions
@@ -72,15 +71,14 @@ def get_last_loss_timestamp() -> Optional[int]:
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
+            res = conn.execute(text("""
                 SELECT timestamp 
                 FROM trades 
                 WHERE pnl < 0 
                 ORDER BY timestamp DESC 
                 LIMIT 1
-            """)
-            row = cursor.fetchone()
+            """))
+            row = res.mappings().fetchone()
             return int(row['timestamp']) if row else None
     except Exception as e:
         logger.error(f"Error fetching last loss timestamp: {e}")
@@ -171,13 +169,12 @@ def verify_trade_execution_safety(symbol: str, side: str, current_price: float, 
             opening_strategy = None
             try:
                 with get_db_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
+                    res = conn.execute(text("""
                         SELECT strategy FROM trades 
-                        WHERE symbol = ? AND side = 'BUY' 
+                        WHERE symbol = :symbol AND side = 'BUY' 
                         ORDER BY timestamp DESC LIMIT 1
-                    """, (symbol,))
-                    row = cursor.fetchone()
+                    """), {"symbol": symbol})
+                    row = res.mappings().fetchone()
                     if row:
                         opening_strategy = row['strategy']
             except Exception as e:
