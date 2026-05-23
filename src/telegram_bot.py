@@ -21,7 +21,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/status - Check bot status, balance, and active trades\n"
         "/pause - Emergency halt all trades\n"
         "/resume - Resume normal trading operations\n"
-        "/trade - Force execute a trade evaluation cycle"
+        "/trade - Force execute a trade evaluation cycle\n"
+        "/mocktrade <buy|sell> <symbol> - Execute a manual mock/simulated trade"
     )
 
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -58,15 +59,62 @@ async def trade_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # We trigger the pipeline asynchronously or directly if we import it.
     # Since telegram polling runs alongside our scheduler, we can run it.
     try:
-        from src.pipeline import run_pipeline_cycle
-        # We need to run the blocking pipeline cycle in a thread or just call it directly 
-        # since python-telegram-bot handles async, but pipeline might be sync.
-        # Run it synchronously for now, or just notify.
-        run_pipeline_cycle()
+        from src.pipeline import run_pipeline_cycle, initialize_exchange
+        exchange = initialize_exchange()
+        run_pipeline_cycle(exchange)
         await update.message.reply_text("✅ Manual cycle completed.")
     except Exception as e:
         logger.error(f"Error during manual trade cycle: {e}")
         await update.message.reply_text(f"❌ Error executing cycle: {e}")
+
+async def mocktrade_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not verify_user(update): return
+    
+    if settings.emergency_halt:
+        await update.message.reply_text("❌ Cannot execute mock trade: System is currently PAUSED.")
+        return
+        
+    args = context.args
+    if not args or len(args) < 2:
+        await update.message.reply_text(
+            "⚠️ Usage: `/mocktrade <buy|sell> <symbol>`\n"
+            "Example: `/mocktrade buy BTC/USDT` or `/mocktrade sell BTC/USDT`"
+        )
+        return
+        
+    side = args[0].upper()
+    symbol = args[1].upper()
+    
+    if side not in ("BUY", "SELL"):
+        await update.message.reply_text("❌ Invalid side. Must be either `buy` or `sell`.")
+        return
+        
+    await update.message.reply_text(f"⚙️ Executing mock {side} order for {symbol}...")
+    
+    try:
+        from src.pipeline import initialize_exchange
+        from src.execution import execute_market_order
+        
+        exchange = initialize_exchange()
+        order = execute_market_order(exchange, symbol, side, "Mock_Manual")
+        
+        if order:
+            order_id = order.get('id', 'unknown')
+            price = order.get('price', 0.0)
+            amount = order.get('amount', 0.0)
+            await update.message.reply_text(
+                f"✅ Mock Trade Executed Successfully!\n\n"
+                f"Order ID: `{order_id}`\n"
+                f"Symbol: `{symbol}`\n"
+                f"Side: `{side}`\n"
+                f"Amount: `{amount}`\n"
+                f"Price: `{price}` USDT"
+            )
+        else:
+            await update.message.reply_text("❌ Mock trade execution rejected by risk engine or failed. Check logs.")
+    except Exception as e:
+        logger.error(f"Error during mock trade execution: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Error: {e}")
 
 def create_bot_application() -> Application:
     if not settings.telegram_token:
@@ -80,6 +128,7 @@ def create_bot_application() -> Application:
     app.add_handler(CommandHandler("pause", pause_cmd))
     app.add_handler(CommandHandler("resume", resume_cmd))
     app.add_handler(CommandHandler("trade", trade_cmd))
+    app.add_handler(CommandHandler("mocktrade", mocktrade_cmd))
     
     return app
 
