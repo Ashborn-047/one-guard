@@ -22,7 +22,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/pause - Emergency halt all trades\n"
         "/resume - Resume normal trading operations\n"
         "/trade - Force execute a trade evaluation cycle\n"
-        "/mocktrade <buy|sell> <symbol> - Execute a manual mock/simulated trade"
+        "/mocktrade <buy|sell> <symbol> - Execute a manual mock/simulated trade\n"
+        "/leaderboard - View strategy comparison performance\n"
+        "/papertrades [strat] - View recent paper trades"
     )
 
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -30,12 +32,69 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     mode = "🔴 LIVE" if settings.is_live else "🟢 SANDBOX"
     status = "⏸️ PAUSED" if settings.emergency_halt else "▶️ ACTIVE"
     
+    # Calculate paper trading stats
+    paper_info = ""
+    try:
+        from src.db import get_strategy_performance_data
+        perf_data = get_strategy_performance_data()
+        if perf_data:
+            total_pnl = sum(d["total_pnl"] for d in perf_data)
+            pnl_str = f"+${total_pnl:,.4f}" if total_pnl >= 0 else f"-${abs(total_pnl):,.4f}"
+            total_trades = sum(d["total_trades"] for d in perf_data)
+            paper_info = f"\n📈 **Paper Trading Stats**\nTotal Trades: {total_trades}\nNet PnL: {pnl_str}"
+    except Exception as e:
+        logger.error(f"Error reading paper stats for status: {e}")
+        
     await update.message.reply_text(
         f"📊 **OneGuard Status**\n"
         f"Mode: {mode}\n"
         f"Status: {status}\n"
         f"Max Trade Size: {settings.max_position_size} USDT"
+        f"{paper_info}"
     )
+
+async def leaderboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not verify_user(update): return
+    try:
+        from src.paper_engine import get_leaderboard
+        leaderboard = get_leaderboard()
+        await update.message.reply_text(leaderboard, parse_mode="Markdown")
+    except Exception as e:
+        logger.error(f"Error fetching leaderboard: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Error fetching leaderboard: {e}")
+
+async def papertrades_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not verify_user(update): return
+    try:
+        from src.db import get_recent_paper_trades
+        import datetime
+        
+        args = context.args
+        strategy = args[0].upper() if args else None
+        
+        trades = get_recent_paper_trades(limit=10, strategy=strategy)
+        if not trades:
+            await update.message.reply_text("📝 No paper trades found.")
+            return
+            
+        lines = ["📝 *Recent Paper Trades*\n"]
+        for t in trades:
+            ts = t["timestamp"]
+            ts_sec = ts / 1000.0 if ts > 1e11 else ts
+            dt_str = datetime.datetime.fromtimestamp(ts_sec, datetime.timezone.utc).strftime("%m-%d %H:%M")
+            pnl_display = ""
+            if t["pnl"] is not None:
+                pnl_display = f" | PnL: `+${t['pnl']:,.4f}`" if t["pnl"] >= 0 else f" | PnL: `-${abs(t['pnl']):,.4f}`"
+            
+            lines.append(
+                f"• `[{dt_str}]` *{t['side']}* `{t['symbol']}`\n"
+                f"  Strat: `{t['strategy']}` | Price: `${t['price']:,.2f}`{pnl_display}"
+            )
+            
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    except Exception as e:
+        logger.error(f"Error fetching paper trades: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Error: {e}")
 
 async def pause_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not verify_user(update): return
@@ -129,6 +188,8 @@ def create_bot_application() -> Application:
     app.add_handler(CommandHandler("resume", resume_cmd))
     app.add_handler(CommandHandler("trade", trade_cmd))
     app.add_handler(CommandHandler("mocktrade", mocktrade_cmd))
+    app.add_handler(CommandHandler("leaderboard", leaderboard_cmd))
+    app.add_handler(CommandHandler("papertrades", papertrades_cmd))
     
     return app
 

@@ -189,6 +189,72 @@ def initialize_db() -> bool:
                     );
                 """))
             
+            # 5. Paper Trades Table (strategy-isolated virtual portfolios)
+            if is_postgres:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS paper_trades (
+                        id SERIAL PRIMARY KEY,
+                        timestamp BIGINT NOT NULL,
+                        symbol VARCHAR NOT NULL,
+                        strategy VARCHAR NOT NULL,
+                        side VARCHAR NOT NULL,
+                        price DOUBLE PRECISION NOT NULL,
+                        amount DOUBLE PRECISION NOT NULL,
+                        cost DOUBLE PRECISION NOT NULL,
+                        fee DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                        pnl DOUBLE PRECISION,
+                        order_id VARCHAR NOT NULL
+                    );
+                """))
+            else:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS paper_trades (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp INTEGER NOT NULL,
+                        symbol TEXT NOT NULL,
+                        strategy TEXT NOT NULL,
+                        side TEXT NOT NULL,
+                        price REAL NOT NULL,
+                        amount REAL NOT NULL,
+                        cost REAL NOT NULL,
+                        fee REAL NOT NULL DEFAULT 0.0,
+                        pnl REAL,
+                        order_id TEXT NOT NULL
+                    );
+                """))
+
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_paper_trades_strategy ON paper_trades(strategy, symbol, timestamp DESC);"))
+
+            # 6. Strategy Performance Table (leaderboard tracking)
+            if is_postgres:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS strategy_performance (
+                        strategy VARCHAR PRIMARY KEY,
+                        total_trades INTEGER DEFAULT 0,
+                        winning_trades INTEGER DEFAULT 0,
+                        losing_trades INTEGER DEFAULT 0,
+                        total_pnl DOUBLE PRECISION DEFAULT 0.0,
+                        max_drawdown DOUBLE PRECISION DEFAULT 0.0,
+                        best_trade_pnl DOUBLE PRECISION DEFAULT 0.0,
+                        worst_trade_pnl DOUBLE PRECISION DEFAULT 0.0,
+                        last_updated BIGINT
+                    );
+                """))
+            else:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS strategy_performance (
+                        strategy TEXT PRIMARY KEY,
+                        total_trades INTEGER DEFAULT 0,
+                        winning_trades INTEGER DEFAULT 0,
+                        losing_trades INTEGER DEFAULT 0,
+                        total_pnl REAL DEFAULT 0.0,
+                        max_drawdown REAL DEFAULT 0.0,
+                        best_trade_pnl REAL DEFAULT 0.0,
+                        worst_trade_pnl REAL DEFAULT 0.0,
+                        last_updated INTEGER
+                    );
+                """))
+
             logger.info("Database schemas and indexes initialized successfully.")
             return True
             
@@ -511,6 +577,203 @@ def get_strategy_data(symbol: str, limit: int = 100, timeframe: str = "15m") -> 
     except Exception as e:
         logger.error(f"Failed to fetch merged strategy data for {symbol} ({timeframe}): {e}")
         return pd.DataFrame()
+
+
+# ──────────────────────────────────────────────
+# Paper Trading Database Functions
+# ──────────────────────────────────────────────
+
+def log_paper_trade(trade_data: Dict[str, Any]) -> bool:
+    """Logs a paper (simulated) trade to the paper_trades table."""
+    try:
+        with get_db_connection() as conn:
+            conn.execute(text("""
+                INSERT INTO paper_trades (timestamp, symbol, strategy, side, price, amount, cost, fee, pnl, order_id)
+                VALUES (:timestamp, :symbol, :strategy, :side, :price, :amount, :cost, :fee, :pnl, :order_id);
+            """), {
+                "timestamp": trade_data["timestamp"],
+                "symbol": trade_data["symbol"],
+                "strategy": trade_data["strategy"],
+                "side": trade_data["side"],
+                "price": trade_data["price"],
+                "amount": trade_data["amount"],
+                "cost": trade_data["cost"],
+                "fee": trade_data.get("fee", 0.0),
+                "pnl": trade_data.get("pnl"),
+                "order_id": trade_data["order_id"]
+            })
+            logger.info(
+                f"PAPER TRADE LOGGED: [{trade_data['strategy']}] {trade_data['side']} "
+                f"{trade_data['amount']:.6f} {trade_data['symbol']} at {trade_data['price']:.2f} "
+                f"| PnL: {trade_data.get('pnl')}"
+            )
+            return True
+    except Exception as e:
+        logger.error(f"Failed to log paper trade: {e}")
+        return False
+
+
+def get_paper_positions(strategy: str) -> Dict[str, Dict[str, Any]]:
+    """
+    Returns active paper positions for a specific strategy.
+    An active position means net BUY quantity > sells for that strategy+symbol.
+    Returns: {symbol: {"qty": float, "entry_price": float, "entry_timestamp": int}}
+    """
+    positions = {}
+    try:
+        with get_db_connection() as conn:
+            # Get net quantity per symbol for this strategy
+            res = conn.execute(text("""
+                SELECT symbol,
+                       SUM(CASE WHEN side = 'BUY' THEN amount ELSE -amount END) as net_qty
+                FROM paper_trades
+                WHERE strategy = :strategy
+                GROUP BY symbol
+            """), {"strategy": strategy})
+            rows = res.fetchall()
+            for row in rows:
+                net_qty = float(row[1])
+                if net_qty > 1e-8:  # has active position
+                    # Get the entry price of the most recent BUY
+                    entry_res = conn.execute(text("""
+                        SELECT price, timestamp FROM paper_trades
+                        WHERE strategy = :strategy AND symbol = :symbol AND side = 'BUY'
+                        ORDER BY timestamp DESC LIMIT 1
+                    """), {"strategy": strategy, "symbol": row[0]})
+                    entry_row = entry_res.fetchone()
+                    if entry_row:
+                        positions[row[0]] = {
+                            "qty": net_qty,
+                            "entry_price": float(entry_row[0]),
+                            "entry_timestamp": int(entry_row[1])
+                        }
+    except Exception as e:
+        logger.error(f"Error getting paper positions for strategy '{strategy}': {e}")
+    return positions
+
+
+def get_all_paper_positions() -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """
+    Returns all active paper positions across all strategies.
+    Returns: {strategy: {symbol: {"qty": float, "entry_price": float}}}
+    """
+    all_positions = {}
+    for strategy in ["RSI", "BB", "EMA"]:
+        positions = get_paper_positions(strategy)
+        if positions:
+            all_positions[strategy] = positions
+    return all_positions
+
+
+def get_strategy_performance_data() -> List[Dict[str, Any]]:
+    """
+    Returns strategy performance data for the leaderboard, ordered by total_pnl.
+    """
+    try:
+        with get_db_connection() as conn:
+            res = conn.execute(text("""
+                SELECT strategy, total_trades, winning_trades, losing_trades,
+                       total_pnl, max_drawdown, best_trade_pnl, worst_trade_pnl, last_updated
+                FROM strategy_performance
+                ORDER BY total_pnl DESC
+            """))
+            rows = res.mappings().fetchall()
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error fetching strategy performance: {e}")
+        return []
+
+
+def update_strategy_performance(strategy: str, pnl: float, is_win: bool) -> bool:
+    """
+    Updates the cumulative performance metrics for a strategy after a closed trade (SELL).
+    """
+    try:
+        now_ms = int(time.time() * 1000)
+        with get_db_connection() as conn:
+            # Check if record exists
+            res = conn.execute(text(
+                "SELECT total_pnl, max_drawdown, best_trade_pnl, worst_trade_pnl FROM strategy_performance WHERE strategy = :s"
+            ), {"s": strategy})
+            row = res.fetchone()
+
+            if row:
+                current_pnl = float(row[0]) + pnl
+                current_drawdown = float(row[1])
+                best = float(row[2])
+                worst = float(row[3])
+                new_drawdown = min(current_drawdown, current_pnl) if current_pnl < current_drawdown else current_drawdown
+                new_best = max(best, pnl)
+                new_worst = min(worst, pnl)
+
+                conn.execute(text("""
+                    UPDATE strategy_performance SET
+                        total_trades = total_trades + 1,
+                        winning_trades = winning_trades + :win,
+                        losing_trades = losing_trades + :loss,
+                        total_pnl = :total_pnl,
+                        max_drawdown = :max_dd,
+                        best_trade_pnl = :best,
+                        worst_trade_pnl = :worst,
+                        last_updated = :ts
+                    WHERE strategy = :s
+                """), {
+                    "win": 1 if is_win else 0,
+                    "loss": 0 if is_win else 1,
+                    "total_pnl": current_pnl,
+                    "max_dd": new_drawdown,
+                    "best": new_best,
+                    "worst": new_worst,
+                    "ts": now_ms,
+                    "s": strategy
+                })
+            else:
+                conn.execute(text("""
+                    INSERT INTO strategy_performance 
+                        (strategy, total_trades, winning_trades, losing_trades, total_pnl, max_drawdown, best_trade_pnl, worst_trade_pnl, last_updated)
+                    VALUES (:s, 1, :win, :loss, :pnl, :dd, :best, :worst, :ts)
+                """), {
+                    "s": strategy,
+                    "win": 1 if is_win else 0,
+                    "loss": 0 if is_win else 1,
+                    "pnl": pnl,
+                    "dd": min(0.0, pnl),
+                    "best": max(0.0, pnl),
+                    "worst": min(0.0, pnl),
+                    "ts": now_ms
+                })
+            return True
+    except Exception as e:
+        logger.error(f"Error updating strategy performance for '{strategy}': {e}")
+        return False
+
+
+def get_recent_paper_trades(limit: int = 10, strategy: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Returns the most recent paper trades, optionally filtered by strategy.
+    """
+    try:
+        with get_db_connection() as conn:
+            if strategy:
+                res = conn.execute(text("""
+                    SELECT timestamp, symbol, strategy, side, price, amount, cost, fee, pnl, order_id
+                    FROM paper_trades
+                    WHERE strategy = :strategy
+                    ORDER BY timestamp DESC
+                    LIMIT :limit
+                """), {"strategy": strategy, "limit": limit})
+            else:
+                res = conn.execute(text("""
+                    SELECT timestamp, symbol, strategy, side, price, amount, cost, fee, pnl, order_id
+                    FROM paper_trades
+                    ORDER BY timestamp DESC
+                    LIMIT :limit
+                """), {"limit": limit})
+            rows = res.mappings().fetchall()
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error fetching recent paper trades: {e}")
+        return []
 
 
 if __name__ == "__main__":

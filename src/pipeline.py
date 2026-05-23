@@ -11,6 +11,7 @@ from src.indicators import calculate_technical_indicators
 from src.strategies import evaluate_all_strategies
 from src.execution import check_and_execute_exits, execute_market_order
 from src.telemetry import alert_bot_startup, alert_system_error, alert_clock_drift
+from src.paper_engine import run_paper_trading_cycle
 
 logger = logging.getLogger("OneGuard.Pipeline")
 
@@ -132,6 +133,12 @@ def run_pipeline_cycle(exchange: ccxt.Exchange):
                     elif signal == "SELL":
                         logger.info(f"Signal triggered: {strategy_name} -> SELL {symbol}. Attempting exit...")
                         execute_market_order(exchange, symbol, "SELL", strategy_name)
+
+                # 8. Run parallel paper trading cycle for all strategies
+                try:
+                    run_paper_trading_cycle(symbol, float(df["close"].iloc[-1]))
+                except Exception as e:
+                    logger.error(f"Error running paper trading cycle for {symbol}: {e}", exc_info=True)
             else:
                 logger.error(f"Failed to save indicators for {symbol} to database.")
                 
@@ -169,6 +176,13 @@ def start_scheduler():
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
         logger.info("Pipeline Scheduler stopped by user.")
+
+
+def main():
+    """
+    Main entry point for starting the scheduler backend.
+    """
+    start_scheduler()
 
 
 if __name__ == "__main__":
