@@ -9,6 +9,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'http://localhost:8000');
+
 // Type Definitions
 interface BotStatus {
   is_live: boolean;
@@ -146,7 +148,7 @@ export default function App() {
 
   const fetchSymbols = async () => {
     try {
-      const res = await fetch('/api/symbols');
+      const res = await fetch(`${API_BASE_URL}/api/symbols`);
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         setSymbols(data);
@@ -163,7 +165,7 @@ export default function App() {
     if (!status) return;
     const newIsLive = !status.is_live;
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetch(`${API_BASE_URL}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_live: newIsLive })
@@ -185,7 +187,7 @@ export default function App() {
     if (!status) return;
     const newHalt = !status.emergency_halt;
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetch(`${API_BASE_URL}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ emergency_halt: newHalt })
@@ -220,7 +222,7 @@ export default function App() {
 
   const saveSettings = async () => {
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetch(`${API_BASE_URL}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editValues)
@@ -254,11 +256,11 @@ export default function App() {
     try {
       setError(null);
       const [statusRes, metricsRes, positionsRes, tradesRes, marketStatusRes] = await Promise.all([
-        fetch('/api/status').then(r => r.json()),
-        fetch('/api/metrics').then(r => r.json()),
-        fetch('/api/positions').then(r => r.json()),
-        fetch('/api/trades').then(r => r.json()),
-        fetch('/api/market-status').then(r => r.json())
+        fetch(`${API_BASE_URL}/api/status`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/metrics`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/positions`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/trades`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/market-status`).then(r => r.json())
       ]);
 
       setStatus(statusRes);
@@ -275,7 +277,7 @@ export default function App() {
   // Fetch Candlestick & Indicators Chart Data
   const fetchChart = async () => {
     try {
-      const chartRes = await fetch(`/api/chart?symbol=${encodeURIComponent(selectedPair)}&timeframe=${timeframe}&limit=${candleCount}`).then(r => r.json());
+      const chartRes = await fetch(`${API_BASE_URL}/api/chart?symbol=${encodeURIComponent(selectedPair)}&timeframe=${timeframe}&limit=${candleCount}`).then(r => r.json());
       setChartData(chartRes);
     } catch (e) {
       console.error('Error fetching candlestick chart data:', e);
