@@ -26,29 +26,23 @@ class TestOneGuardRiskAndStrategies(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        # Override the database file configuration to use a separate test database
-        cls.original_db_file = settings.db_file
-        object.__setattr__(settings, 'db_file', 'one_guard_test.db')
+        from sqlalchemy import create_engine
+        import src.db
         
-        # Clear or initialize the test database
-        if settings.db_path.exists():
-            try:
-                settings.db_path.unlink()
-            except PermissionError:
-                pass
-        initialize_db()
+        # Override the database engine to use a safe, local in-memory SQLite database
+        cls.original_engine = src.db.engine
+        cls.original_is_postgres = src.db.is_postgres
+        
+        src.db.is_postgres = False
+        src.db.engine = create_engine("sqlite://", isolation_level="AUTOCOMMIT")
+        src.db.initialize_db()
         
     @classmethod
     def tearDownClass(cls):
-        # Unlink the test database first while settings is still pointing to it
-        test_db_path = settings.db_path
-        if test_db_path.exists():
-            try:
-                test_db_path.unlink()
-            except PermissionError:
-                pass # SQLite file might be temporarily locked, ignore
         # Restore original database configuration
-        object.__setattr__(settings, 'db_file', cls.original_db_file)
+        import src.db
+        src.db.engine = cls.original_engine
+        src.db.is_postgres = cls.original_is_postgres
                 
     def setUp(self):
         # Clear trades table before every test
