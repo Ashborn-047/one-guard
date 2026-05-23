@@ -7,7 +7,7 @@ on:
     paths:
       - 'dashboard/frontend/**'
       - '.github/workflows/deploy-pages.yml'
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: write
