@@ -69,6 +69,7 @@ class Config:
         self.telegram_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
         self.telegram_chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "").strip()
         self.db_file: str = os.getenv("DATABASE_FILE", "one_guard_trading.db").strip()
+        self.database_url: str = os.getenv("DATABASE_URL", "").strip()
 
     @property
     def db_path(self) -> Path:
@@ -79,21 +80,33 @@ class Config:
         if key in self.__dict__:
             return self.__dict__[key]
 
-        import sqlite3
-        db_path = self.db_path
-        if not db_path.exists():
-            return default
         try:
-            conn = sqlite3.connect(str(db_path), timeout=5.0)
-            cursor = conn.cursor()
-            # Verify if table exists
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='system_config'")
-            if not cursor.fetchone():
+            if self.database_url.startswith("postgres"):
+                import psycopg2
+                conn = psycopg2.connect(self.database_url, connect_timeout=5)
+                cursor = conn.cursor()
+                cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name='system_config'")
+                if not cursor.fetchone():
+                    conn.close()
+                    return default
+                cursor.execute("SELECT value FROM system_config WHERE key = %s", (key,))
+                row = cursor.fetchone()
                 conn.close()
-                return default
-            cursor.execute("SELECT value FROM system_config WHERE key = ?", (key,))
-            row = cursor.fetchone()
-            conn.close()
+            else:
+                import sqlite3
+                db_path = self.db_path
+                if not db_path.exists():
+                    return default
+                conn = sqlite3.connect(str(db_path), timeout=5.0)
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='system_config'")
+                if not cursor.fetchone():
+                    conn.close()
+                    return default
+                cursor.execute("SELECT value FROM system_config WHERE key = ?", (key,))
+                row = cursor.fetchone()
+                conn.close()
+                
             if row:
                 val = row[0]
                 if isinstance(default, bool):
@@ -111,24 +124,41 @@ class Config:
         # Update instance dictionary as well to keep in-sync if modified (and for tests)
         self.__dict__[key] = value
 
-        import sqlite3
-        db_path = self.db_path
         try:
-            db_path.parent.mkdir(parents=True, exist_ok=True)
-            conn = sqlite3.connect(str(db_path), timeout=5.0)
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS system_config (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
+            if self.database_url.startswith("postgres"):
+                import psycopg2
+                conn = psycopg2.connect(self.database_url, connect_timeout=5)
+                cursor = conn.cursor()
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS system_config (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                """)
+                cursor.execute(
+                    "INSERT INTO system_config (key, value) VALUES (%s, %s) ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value",
+                    (key, str(value))
                 )
-            """)
-            cursor.execute(
-                "INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                (key, str(value))
-            )
-            conn.commit()
-            conn.close()
+                conn.commit()
+                conn.close()
+            else:
+                import sqlite3
+                db_path = self.db_path
+                db_path.parent.mkdir(parents=True, exist_ok=True)
+                conn = sqlite3.connect(str(db_path), timeout=5.0)
+                cursor = conn.cursor()
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS system_config (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                """)
+                cursor.execute(
+                    "INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    (key, str(value))
+                )
+                conn.commit()
+                conn.close()
             return True
         except Exception as e:
             logger.error(f"Failed to set database configuration key '{key}' to '{value}': {e}")

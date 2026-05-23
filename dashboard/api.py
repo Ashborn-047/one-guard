@@ -9,6 +9,9 @@ import ccxt
 import pandas as pd
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from sqlalchemy import text
 
 # Add project root to path to resolve src imports correctly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -67,36 +70,27 @@ def recalculate_and_save_all_indicators(symbol: str, limit: int = 1000, timefram
         bbm_col = [col for col in bb_df.columns if col.startswith("BBM")][0]
         bbl_col = [col for col in bb_df.columns if col.startswith("BBL")][0]
         
-        # Save indicators in a single transaction
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("BEGIN TRANSACTION;")
-            for idx, row in df.iterrows():
-                timestamp = int(row["timestamp"])
-                
-                # Check if we have valid values for the indicators
-                rsi_val = float(rsi_series.loc[idx]) if not pd.isna(rsi_series.loc[idx]) else None
-                ema_fast_val = float(ema_fast_series.loc[idx]) if not pd.isna(ema_fast_series.loc[idx]) else None
-                ema_slow_val = float(ema_slow_series.loc[idx]) if not pd.isna(ema_slow_series.loc[idx]) else None
-                bb_upper_val = float(bb_df.loc[idx, bbu_col]) if not pd.isna(bb_df.loc[idx, bbu_col]) else None
-                bb_middle_val = float(bb_df.loc[idx, bbm_col]) if not pd.isna(bb_df.loc[idx, bbm_col]) else None
-                bb_lower_val = float(bb_df.loc[idx, bbl_col]) if not pd.isna(bb_df.loc[idx, bbl_col]) else None
-                
-                cursor.execute("""
-                    INSERT OR REPLACE INTO indicators (symbol, timeframe, timestamp, rsi, ema_fast, ema_slow, bb_upper, bb_middle, bb_lower)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    symbol,
-                    timeframe,
-                    timestamp,
-                    rsi_val,
-                    ema_fast_val,
-                    ema_slow_val,
-                    bb_upper_val,
-                    bb_middle_val,
-                    bb_lower_val
-                ))
-            cursor.execute("COMMIT;")
+        # Save indicators one by one using the existing db abstraction
+        for idx, row in df.iterrows():
+            timestamp = int(row["timestamp"])
+            
+            # Check if we have valid values for the indicators
+            rsi_val = float(rsi_series.loc[idx]) if not pd.isna(rsi_series.loc[idx]) else None
+            ema_fast_val = float(ema_fast_series.loc[idx]) if not pd.isna(ema_fast_series.loc[idx]) else None
+            ema_slow_val = float(ema_slow_series.loc[idx]) if not pd.isna(ema_slow_series.loc[idx]) else None
+            bb_upper_val = float(bb_df.loc[idx, bbu_col]) if not pd.isna(bb_df.loc[idx, bbu_col]) else None
+            bb_middle_val = float(bb_df.loc[idx, bbm_col]) if not pd.isna(bb_df.loc[idx, bbm_col]) else None
+            bb_lower_val = float(bb_df.loc[idx, bbl_col]) if not pd.isna(bb_df.loc[idx, bbl_col]) else None
+            
+            save_indicators(symbol, timestamp, {
+                "rsi": rsi_val,
+                "ema_fast": ema_fast_val,
+                "ema_slow": ema_slow_val,
+                "bb_upper": bb_upper_val,
+                "bb_middle": bb_middle_val,
+                "bb_lower": bb_lower_val
+            }, timeframe=timeframe)
+            
         logger.info(f"MarketDataFeed: Successfully calculated and saved indicators for {len(df)} candles for {symbol} ({timeframe}).")
     except Exception as e:
         logger.error(f"MarketDataFeed: Error calculating historical indicators for {symbol}: {e}", exc_info=True)
@@ -135,10 +129,8 @@ class MarketDataFeed:
         """Purge all existing candle and indicator data (seed/stale) on first live fetch."""
         try:
             with get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM candles;")
-                cursor.execute("DELETE FROM indicators;")
-                conn.commit()
+                conn.execute(text("DELETE FROM candles;"))
+                conn.execute(text("DELETE FROM indicators;"))
             self._seed_cleared = True
             logger.info("MarketDataFeed: Cleared stale seed data from candles and indicators tables.")
         except Exception as e:
@@ -265,6 +257,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Optional static file serving for React frontend
+frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+if os.path.exists(frontend_dist_path):
+    logger.info(f"Frontend dist found at {frontend_dist_path}. Mounting static files.")
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist_path, "assets")), name="assets")
+    
+    @app.get("/")
+    def serve_react_app():
+        return FileResponse(os.path.join(frontend_dist_path, "index.html"))
+else:
+    logger.warning(f"Frontend dist not found at {frontend_dist_path}. React app will not be served.")
+
+
 # Initialize CCXT exchange client
 _exchange = None
 
@@ -314,18 +319,16 @@ def get_performance_metrics():
     }
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            res = conn.execute(text("SELECT COUNT(*) as cnt FROM trades"))
+            row = res.mappings().fetchone()
+            metrics["total_trades"] = row["cnt"] if row else 0
             
-            # Fetch total count
-            cursor.execute("SELECT COUNT(*) as cnt FROM trades")
-            metrics["total_trades"] = cursor.fetchone()["cnt"]
-            
-            # Fetch closed trades (trades with realized PnL)
-            cursor.execute("SELECT pnl FROM trades WHERE pnl IS NOT NULL")
-            pnl_rows = cursor.fetchall()
+            res = conn.execute(text("SELECT pnl FROM trades WHERE pnl IS NOT NULL"))
+            pnl_rows = res.mappings().fetchall()
             
             if pnl_rows:
                 pnls = [float(row["pnl"]) for row in pnl_rows]
+
                 metrics["closed_trades"] = len(pnls)
                 metrics["realized_pnl"] = sum(pnls)
                 
@@ -409,14 +412,13 @@ def read_positions():
         strategy = "Unknown"
         try:
             with get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
+                res = conn.execute(text("""
                     SELECT timestamp, price, strategy 
                     FROM trades 
-                    WHERE symbol = ? AND side = 'BUY' 
+                    WHERE symbol = :symbol AND side = 'BUY' 
                     ORDER BY timestamp DESC LIMIT 1
-                """, (symbol,))
-                row = cursor.fetchone()
+                """), {"symbol": symbol})
+                row = res.mappings().fetchone()
                 if row:
                     entry_price = float(row["price"])
                     entry_time = int(row["timestamp"])
@@ -627,50 +629,36 @@ def sync_exchange_trades():
                     order_trades[order_id] = []
                 order_trades[order_id].append(t)
                 
-            # Aggregate and save trades
             with get_db_connection() as conn:
-                cursor = conn.cursor()
                 for order_id, t_list in order_trades.items():
-                    # Check if trade already exists in our database
-                    cursor.execute("SELECT id FROM trades WHERE order_id = ?", (order_id,))
-                    if cursor.fetchone():
+                    res = conn.execute(text("SELECT id FROM trades WHERE order_id = :order_id"), {"order_id": order_id})
+                    if res.fetchone():
                         continue
                         
-                    # Sort trades by timestamp ascending
                     t_list = sorted(t_list, key=lambda x: x.get('timestamp') or 0)
-                    
                     first_t = t_list[0]
                     
                     timestamp = first_t.get('timestamp') or int(time.time() * 1000)
                     side = first_t.get('side').upper()
                     
-                    # Calculate totals
                     total_amount = sum(float(x.get('amount') or 0.0) for x in t_list)
                     total_cost = sum(float(x.get('cost') or 0.0) for x in t_list)
                     
-                    # Calculate weighted average price
                     if total_amount > 0:
                         avg_price = sum(float(x.get('price') or 0.0) * float(x.get('amount') or 0.0) for x in t_list) / total_amount
                     else:
                         avg_price = float(first_t.get('price') or 0.0)
                         
-                    # Calculate fee cost
-                    total_fee = 0.0
-                    for x in t_list:
-                        fee = x.get('fee')
-                        if fee:
-                            total_fee += float(fee.get('cost') or 0.0)
+                    total_fee = sum(float(x.get('fee', {}).get('cost') or 0.0) for x in t_list if x.get('fee'))
                             
-                    # Calculate realized PnL for exits (SELL)
                     pnl = None
                     if side == 'SELL':
-                        # Find the preceding BUY trade for this symbol to calculate PnL.
-                        cursor.execute("""
+                        res = conn.execute(text("""
                             SELECT price, fee FROM trades 
-                            WHERE symbol = ? AND side = 'BUY' 
+                            WHERE symbol = :symbol AND side = 'BUY' 
                             ORDER BY timestamp DESC LIMIT 1
-                        """, (symbol,))
-                        buy_row = cursor.fetchone()
+                        """), {"symbol": symbol})
+                        buy_row = res.mappings().fetchone()
                         if buy_row:
                             entry_price = float(buy_row['price'])
                             entry_fee = float(buy_row['fee']) if buy_row['fee'] is not None else 0.0
@@ -678,23 +666,28 @@ def sync_exchange_trades():
                         else:
                             pnl = 0.0
                             
-                    # Insert the aggregated trade log
-                    cursor.execute("""
+                    is_postgres = settings.database_url.startswith("postgres")
+                    query = """
+                        INSERT INTO trades (timestamp, symbol, strategy, side, price, amount, cost, fee, pnl, order_id)
+                        VALUES (:timestamp, :symbol, :strategy, :side, :price, :amount, :cost, :fee, :pnl, :order_id)
+                        ON CONFLICT(order_id) DO NOTHING
+                    """ if is_postgres else """
                         INSERT OR IGNORE INTO trades (timestamp, symbol, strategy, side, price, amount, cost, fee, pnl, order_id)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        timestamp,
-                        symbol,
-                        "Exchange Sync",
-                        side,
-                        avg_price,
-                        total_amount,
-                        total_cost,
-                        total_fee,
-                        pnl,
-                        order_id
-                    ))
-                conn.commit()
+                        VALUES (:timestamp, :symbol, :strategy, :side, :price, :amount, :cost, :fee, :pnl, :order_id)
+                    """
+                    
+                    conn.execute(text(query), {
+                        "timestamp": timestamp,
+                        "symbol": symbol,
+                        "strategy": "Exchange Sync",
+                        "side": side,
+                        "price": avg_price,
+                        "amount": total_amount,
+                        "cost": total_cost,
+                        "fee": total_fee,
+                        "pnl": pnl,
+                        "order_id": order_id
+                    })
             logger.info(f"Successfully synced exchange trades for {symbol}.")
         except Exception as e:
             logger.error(f"Error syncing trades from exchange for {symbol}: {e}")
@@ -709,14 +702,13 @@ def read_trades(limit: int = Query(100, ge=1, le=200)):
     trades_list = []
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
+            res = conn.execute(text("""
                 SELECT timestamp, order_id, symbol, strategy, side, price, amount, cost, fee, pnl
                 FROM trades
                 ORDER BY timestamp DESC
-                LIMIT ?
-            """, (limit,))
-            rows = cursor.fetchall()
+                LIMIT :limit
+            """), {"limit": limit})
+            rows = res.mappings().fetchall()
             for row in rows:
                 trades_list.append({
                     "timestamp": row["timestamp"],
@@ -755,9 +747,8 @@ def read_symbols():
     symbols_list = []
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT symbol FROM candles")
-            rows = cursor.fetchall()
+            res = conn.execute(text("SELECT DISTINCT symbol FROM candles"))
+            rows = res.mappings().fetchall()
             symbols_list = [row["symbol"] for row in rows]
     except Exception as e:
         logger.error(f"Failed to query available symbols: {e}")
