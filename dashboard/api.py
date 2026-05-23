@@ -2,8 +2,11 @@ import os
 import sys
 import time
 import logging
+import threading
+from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Optional
 import ccxt
+import pandas as pd
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,7 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.config import settings
-from src.db import get_db_connection, get_strategy_data, initialize_db
+from src.db import get_db_connection, get_strategy_data, get_latest_candles, initialize_db, save_candles, save_indicators
+from src.indicators import calculate_technical_indicators
 from src.risk import get_active_positions, get_weekly_pnl
 
 # Set up logging
@@ -21,7 +25,236 @@ logger = logging.getLogger("OneGuard.API")
 # Initialize database schema
 initialize_db()
 
-app = FastAPI(title="OneGuard Bot Telemetry API", version="1.0.0")
+# ---------------------------------------------------------------------------
+# Live Market Data Feed — Background Ingestion Engine
+# ---------------------------------------------------------------------------
+# Fetches real OHLCV candles from Binance (public endpoint, no API keys needed)
+# and persists them to the local SQLite database with recalculated indicators.
+# Runs as a daemon thread alongside the FastAPI server.
+# ---------------------------------------------------------------------------
+
+TRADING_SYMBOLS = ["BTC/USDT", "ETH/USDT"]
+INGESTION_TIMEFRAME = "15m"
+INGESTION_INTERVAL_SECONDS = 30
+INGESTION_CANDLE_LIMIT = 1000  # Initial backfill depth (covers ~10 days of 15m candles)
+
+
+def recalculate_and_save_all_indicators(symbol: str, limit: int = 1000, timeframe: str = "15m"):
+    """
+    Fetch the latest `limit` candles from DB, calculate technical indicators
+    for each candle (which requires historical context), and save them to DB.
+    """
+    import pandas_ta as ta
+    db_candles = get_latest_candles(symbol, limit=limit, timeframe=timeframe)
+    if not db_candles or len(db_candles) < 30:
+        return
+        
+    df = pd.DataFrame(db_candles)
+    try:
+        # 1. Compute RSI (14)
+        rsi_series = ta.rsi(close=df["close"], length=14)
+        
+        # 2. Compute EMAs (9 and 21)
+        ema_fast_series = ta.ema(close=df["close"], length=9)
+        ema_slow_series = ta.ema(close=df["close"], length=21)
+        
+        # 3. Compute Bollinger Bands (20, 2)
+        bb_df = ta.bbands(close=df["close"], length=20, std=2)
+        if bb_df is None or bb_df.empty:
+            return
+            
+        bbu_col = [col for col in bb_df.columns if col.startswith("BBU")][0]
+        bbm_col = [col for col in bb_df.columns if col.startswith("BBM")][0]
+        bbl_col = [col for col in bb_df.columns if col.startswith("BBL")][0]
+        
+        # Save indicators in a single transaction
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("BEGIN TRANSACTION;")
+            for idx, row in df.iterrows():
+                timestamp = int(row["timestamp"])
+                
+                # Check if we have valid values for the indicators
+                rsi_val = float(rsi_series.loc[idx]) if not pd.isna(rsi_series.loc[idx]) else None
+                ema_fast_val = float(ema_fast_series.loc[idx]) if not pd.isna(ema_fast_series.loc[idx]) else None
+                ema_slow_val = float(ema_slow_series.loc[idx]) if not pd.isna(ema_slow_series.loc[idx]) else None
+                bb_upper_val = float(bb_df.loc[idx, bbu_col]) if not pd.isna(bb_df.loc[idx, bbu_col]) else None
+                bb_middle_val = float(bb_df.loc[idx, bbm_col]) if not pd.isna(bb_df.loc[idx, bbm_col]) else None
+                bb_lower_val = float(bb_df.loc[idx, bbl_col]) if not pd.isna(bb_df.loc[idx, bbl_col]) else None
+                
+                cursor.execute("""
+                    INSERT OR REPLACE INTO indicators (symbol, timeframe, timestamp, rsi, ema_fast, ema_slow, bb_upper, bb_middle, bb_lower)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    symbol,
+                    timeframe,
+                    timestamp,
+                    rsi_val,
+                    ema_fast_val,
+                    ema_slow_val,
+                    bb_upper_val,
+                    bb_middle_val,
+                    bb_lower_val
+                ))
+            cursor.execute("COMMIT;")
+        logger.info(f"MarketDataFeed: Successfully calculated and saved indicators for {len(df)} candles for {symbol} ({timeframe}).")
+    except Exception as e:
+        logger.error(f"MarketDataFeed: Error calculating historical indicators for {symbol}: {e}", exc_info=True)
+
+
+class MarketDataFeed:
+    """
+    Background market data ingestion engine.
+    Creates an unauthenticated ccxt Binance client and fetches live OHLCV
+    candles on a recurring interval. Clears stale seed data on the first
+    successful live fetch.
+    """
+
+    def __init__(self):
+        self.status: str = "starting"  # starting | active | error
+        self.data_source: str = "unknown"  # live | seed | unknown
+        self.last_fetch_time: Optional[float] = None
+        self.last_error: Optional[str] = None
+        self.candles_fetched: int = 0
+        self.symbols_tracked: List[str] = TRADING_SYMBOLS
+        self._seed_cleared: bool = False
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._exchange: Optional[ccxt.Exchange] = None
+
+    def _init_exchange(self) -> ccxt.Exchange:
+        """Initialize an unauthenticated Binance client for public data."""
+        exchange = ccxt.binance({
+            'enableRateLimit': True,
+            'timeout': 15000,
+        })
+        logger.info("MarketDataFeed: Initialized unauthenticated Binance client for public OHLCV.")
+        return exchange
+
+    def _clear_seed_data(self):
+        """Purge all existing candle and indicator data (seed/stale) on first live fetch."""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM candles;")
+                cursor.execute("DELETE FROM indicators;")
+                conn.commit()
+            self._seed_cleared = True
+            logger.info("MarketDataFeed: Cleared stale seed data from candles and indicators tables.")
+        except Exception as e:
+            logger.error(f"MarketDataFeed: Failed to clear seed data: {e}")
+
+    def _ingest_cycle(self):
+        """Single ingestion cycle: fetch OHLCV + recalculate indicators for all symbols."""
+        for symbol in self.symbols_tracked:
+            try:
+                # Fetch live OHLCV candles
+                limit = INGESTION_CANDLE_LIMIT if self.data_source == "unknown" else 100
+                ohlcv = self._exchange.fetch_ohlcv(
+                    symbol,
+                    timeframe=INGESTION_TIMEFRAME,
+                    limit=limit
+                )
+
+                if not ohlcv:
+                    logger.warning(f"MarketDataFeed: No candles returned for {symbol}.")
+                    continue
+
+                # On first successful fetch, clear stale seed data
+                if not self._seed_cleared:
+                    self._clear_seed_data()
+
+                # Save candles to database
+                save_candles(symbol, ohlcv, timeframe=INGESTION_TIMEFRAME)
+                self.candles_fetched += len(ohlcv)
+
+                # Recalculate indicators for all candles in the DB (up to 1000) to populate historical indicators
+                recalculate_and_save_all_indicators(symbol, limit=1000, timeframe=INGESTION_TIMEFRAME)
+
+                logger.debug(
+                    f"MarketDataFeed: Ingested {len(ohlcv)} candles for {symbol} | "
+                    f"Latest close: {ohlcv[-1][4]}"
+                )
+
+            except Exception as e:
+                logger.error(f"MarketDataFeed: Error fetching {symbol}: {e}")
+                self.last_error = f"{symbol}: {str(e)}"
+
+        self.last_fetch_time = time.time()
+        self.data_source = "live"
+        self.status = "active"
+
+    def _run_loop(self):
+        """Main background loop — runs until stop event is set."""
+        try:
+            self._exchange = self._init_exchange()
+
+            # Initial fetch immediately on startup
+            logger.info("MarketDataFeed: Running initial data ingestion...")
+            self._ingest_cycle()
+            logger.info(
+                f"MarketDataFeed: Initial ingestion complete. "
+                f"Fetched {self.candles_fetched} candles across {len(self.symbols_tracked)} symbols."
+            )
+
+            # Recurring loop
+            while not self._stop_event.is_set():
+                self._stop_event.wait(timeout=INGESTION_INTERVAL_SECONDS)
+                if self._stop_event.is_set():
+                    break
+                self._ingest_cycle()
+
+        except Exception as e:
+            self.status = "error"
+            self.last_error = str(e)
+            logger.error(f"MarketDataFeed: Fatal error in background loop: {e}", exc_info=True)
+
+        logger.info("MarketDataFeed: Background ingestion loop stopped.")
+
+    def start(self):
+        """Start the background ingestion thread."""
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True, name="MarketDataFeed")
+        self._thread.start()
+        logger.info("MarketDataFeed: Background ingestion thread started.")
+
+    def stop(self):
+        """Signal the background thread to stop gracefully."""
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=5)
+        logger.info("MarketDataFeed: Background ingestion thread stopped.")
+
+    def get_status(self) -> Dict[str, Any]:
+        """Return current feed health status."""
+        return {
+            "feed_active": self.status == "active",
+            "status": self.status,
+            "data_source": self.data_source,
+            "last_fetch": int(self.last_fetch_time) if self.last_fetch_time else None,
+            "symbols_tracked": self.symbols_tracked,
+            "candles_fetched": self.candles_fetched,
+            "error": self.last_error
+        }
+
+
+# Global feed instance
+market_feed = MarketDataFeed()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan: start live data feed on startup, stop on shutdown."""
+    market_feed.start()
+    yield
+    market_feed.stop()
+
+
+app = FastAPI(
+    title="OneGuard Bot Telemetry API",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 # Enable CORS for local dev environment
 app.add_middleware(
@@ -216,18 +449,78 @@ def read_positions():
         
     return position_list
 
+@app.get("/api/market-status")
+def read_market_status():
+    """
+    Returns the health status of the live market data feed.
+    """
+    return market_feed.get_status()
+
+
 @app.get("/api/chart")
-def read_chart(symbol: str = "BTC/USDT", limit: int = Query(100, ge=10, le=500)):
+def read_chart(
+    symbol: str = "BTC/USDT", 
+    timeframe: str = "15m",
+    limit: int = Query(100, ge=10, le=2000)
+):
     """
     Returns candlestick chart data along with overlays and indicators in a format
-    suitable for lightweight-charts.
+    suitable for lightweight-charts. Includes data source metadata and handles on-demand loading.
     """
-    df = get_strategy_data(symbol, limit=limit)
+    supported_timeframes = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
+    if timeframe not in supported_timeframes:
+        timeframe = "15m"
+        
+    timeframe_seconds = {
+        "1m": 60,
+        "5m": 300,
+        "15m": 900,
+        "30m": 1800,
+        "1h": 3600,
+        "4h": 14400,
+        "1d": 86400
+    }
+    
+    # Check data freshness in DB
+    db_candles = get_latest_candles(symbol, limit=1, timeframe=timeframe)
+    need_fetch = False
+    
+    if not db_candles:
+        need_fetch = True
+    else:
+        latest_timestamp_ms = db_candles[-1]["timestamp"]
+        now_ms = int(time.time() * 1000)
+        period_ms = timeframe_seconds[timeframe] * 1000
+        # If the latest candle is older than 2 periods, fetch fresh data
+        if now_ms - latest_timestamp_ms > 2 * period_ms:
+            need_fetch = True
+            
+    if need_fetch:
+        try:
+            logger.info(f"API /api/chart: Cache miss or stale data for {symbol} ({timeframe}). Fetching live candles from Binance...")
+            public_exchange = ccxt.binance({
+                'enableRateLimit': True,
+                'timeout': 15000,
+            })
+            # Fetch 1000 candles to give plenty of history
+            ohlcv = public_exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=1000)
+            if ohlcv:
+                save_candles(symbol, ohlcv, timeframe=timeframe)
+                recalculate_and_save_all_indicators(symbol, limit=1000, timeframe=timeframe)
+                logger.info(f"API /api/chart: Successfully backfilled and saved 1000 candles for {symbol} ({timeframe}).")
+        except Exception as e:
+            logger.error(f"API /api/chart: Failed to fetch live backfill for {symbol} ({timeframe}): {e}")
+            
+    df = get_strategy_data(symbol, limit=limit, timeframe=timeframe)
     if df.empty:
-        return {"candles": [], "indicators": {}}
+        return {
+            "candles": [],
+            "indicators": {},
+            "data_source": market_feed.data_source,
+            "last_updated": int(market_feed.last_fetch_time) if market_feed.last_fetch_time else None
+        }
         
     # Prepare candles array for lightweight-charts: { time: seconds, open, high, low, close }
-    # Lightweight charts expects time in unix timestamp (seconds) or YYYY-MM-DD string
     candles = []
     ema_fast = []
     ema_slow = []
@@ -237,7 +530,6 @@ def read_chart(symbol: str = "BTC/USDT", limit: int = Query(100, ge=10, le=500))
     bb_lower = []
     
     for _, row in df.iterrows():
-        # SQLite timestamps are in milliseconds, convert to seconds
         t_sec = int(row["timestamp"]) // 1000
         
         candles.append({
@@ -276,7 +568,9 @@ def read_chart(symbol: str = "BTC/USDT", limit: int = Query(100, ge=10, le=500))
             "bb_upper": bb_upper,
             "bb_middle": bb_middle,
             "bb_lower": bb_lower
-        }
+        },
+        "data_source": "live",
+        "last_updated": int(time.time())
     }
 
 # Keep track of the last time we synced trades for each symbol to prevent rate limits

@@ -664,3 +664,73 @@ body {
     width: 100%;
   }
 }
+
+/* Live Market Data Feed Status */
+.market-feed-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.feed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.feed-badge.feed-live {
+  color: var(--color-green);
+  background: rgba(63, 185, 80, 0.1);
+  border: 1px solid rgba(63, 185, 80, 0.25);
+  box-shadow: 0 0 12px var(--color-green-glow), inset 0 0 8px rgba(63, 185, 80, 0.05);
+}
+
+.feed-badge.feed-connecting {
+  color: var(--color-warning);
+  background: rgba(219, 109, 40, 0.1);
+  border: 1px solid rgba(219, 109, 40, 0.25);
+  box-shadow: 0 0 12px var(--color-warning-glow);
+}
+
+.feed-badge.feed-error {
+  color: var(--color-red);
+  background: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.25);
+  box-shadow: 0 0 12px var(--color-red-glow);
+}
+
+.feed-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-green);
+  box-shadow: 0 0 6px var(--color-green), 0 0 12px var(--color-green-glow);
+  animation: feed-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes feed-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 6px var(--color-green), 0 0 12px var(--color-green-glow);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+    box-shadow: 0 0 3px var(--color-green), 0 0 6px var(--color-green-glow);
+  }
+}
+
+.feed-freshness {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}

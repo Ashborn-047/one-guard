@@ -4,7 +4,7 @@ import type { IChartApi, Time, IRange } from 'lightweight-charts';
 import { 
   ShieldAlert, ShieldCheck, RefreshCw, Layers, TrendingUp, 
   Activity, ArrowUpRight, ArrowDownRight, Award, Wallet, 
-  Settings, Clock, Percent, DollarSign
+  Settings, Clock, Percent, DollarSign, Wifi, WifiOff, Radio
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
@@ -85,13 +85,26 @@ interface ChartData {
     bb_middle: ChartIndicatorItem[];
     bb_lower: ChartIndicatorItem[];
   };
+  data_source?: string;
+  last_updated?: number | null;
+}
+
+interface MarketStatus {
+  feed_active: boolean;
+  status: string;
+  data_source: string;
+  last_fetch: number | null;
+  symbols_tracked: string[];
+  candles_fetched: number;
+  error: string | null;
 }
 
 export default function App() {
   // Navigation & Control States
   const [selectedPair, setSelectedPair] = useState<string>('BTC/USDT');
   const [refreshRate, setRefreshRate] = useState<string>('30 seconds');
-  const [candleCount, setCandleCount] = useState<number>(100);
+  const [candleCount, setCandleCount] = useState<number>(500);
+  const [timeframe, setTimeframe] = useState<string>('15m');
   const [forceTrigger, setForceTrigger] = useState<number>(0);
   const [symbols, setSymbols] = useState<string[]>(['BTC/USDT', 'ETH/USDT']);
 
@@ -106,6 +119,7 @@ export default function App() {
   const [positions, setPositions] = useState<ActivePosition[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
   
   const [error, setError] = useState<string | null>(null);
 
@@ -239,17 +253,19 @@ export default function App() {
   const fetchTelemetry = async () => {
     try {
       setError(null);
-      const [statusRes, metricsRes, positionsRes, tradesRes] = await Promise.all([
+      const [statusRes, metricsRes, positionsRes, tradesRes, marketStatusRes] = await Promise.all([
         fetch('/api/status').then(r => r.json()),
         fetch('/api/metrics').then(r => r.json()),
         fetch('/api/positions').then(r => r.json()),
-        fetch('/api/trades').then(r => r.json())
+        fetch('/api/trades').then(r => r.json()),
+        fetch('/api/market-status').then(r => r.json())
       ]);
 
       setStatus(statusRes);
       setMetrics(metricsRes);
       setPositions(positionsRes);
       setTrades(tradesRes);
+      setMarketStatus(marketStatusRes);
     } catch (e) {
       console.error('Error fetching bot telemetry data:', e);
       setError('Failed to fetch bot telemetry data. Please ensure the backend API server is running.');
@@ -259,7 +275,7 @@ export default function App() {
   // Fetch Candlestick & Indicators Chart Data
   const fetchChart = async () => {
     try {
-      const chartRes = await fetch(`/api/chart?symbol=${encodeURIComponent(selectedPair)}&limit=${candleCount}`).then(r => r.json());
+      const chartRes = await fetch(`/api/chart?symbol=${encodeURIComponent(selectedPair)}&timeframe=${timeframe}&limit=${candleCount}`).then(r => r.json());
       setChartData(chartRes);
     } catch (e) {
       console.error('Error fetching candlestick chart data:', e);
@@ -280,7 +296,7 @@ export default function App() {
     }, intervalSecs * 1000);
 
     return () => clearInterval(timer);
-  }, [refreshRate, selectedPair, candleCount, forceTrigger]);
+  }, [refreshRate, selectedPair, candleCount, timeframe, forceTrigger]);
 
   // Handle Chart Creation & Updates
   useEffect(() => {
@@ -299,6 +315,42 @@ export default function App() {
 
     const containerWidth = mainChartContainerRef.current.clientWidth;
 
+    const istTickMarkFormatter = (time: Time, tickMarkType: number, locale: string) => {
+      if (typeof time !== 'number') return String(time);
+      const date = new Date(time * 1000);
+      const formatOptions: Intl.DateTimeFormatOptions = {
+        timeZone: 'Asia/Kolkata',
+      };
+
+      switch (tickMarkType) {
+        case 0: // Year
+          formatOptions.year = 'numeric';
+          break;
+        case 1: // Month
+          formatOptions.month = 'short';
+          break;
+        case 2: // DayOfMonth
+          formatOptions.day = 'numeric';
+          break;
+        case 3: // Time
+          formatOptions.hour = '2-digit';
+          formatOptions.minute = '2-digit';
+          formatOptions.hour12 = false;
+          break;
+        case 4: // TimeWithSeconds
+          formatOptions.hour = '2-digit';
+          formatOptions.minute = '2-digit';
+          formatOptions.second = '2-digit';
+          formatOptions.hour12 = false;
+          break;
+        default:
+          formatOptions.hour = '2-digit';
+          formatOptions.minute = '2-digit';
+          formatOptions.hour12 = false;
+      }
+      return new Intl.DateTimeFormat(locale, formatOptions).format(date);
+    };
+
     // Create Main Candlestick Chart
     const mainChart = createChart(mainChartContainerRef.current, {
       width: containerWidth,
@@ -307,6 +359,21 @@ export default function App() {
         background: { type: ColorType.Solid, color: '#11141a' },
         textColor: '#8b949e',
         fontSize: 11,
+      },
+      localization: {
+        locale: 'en-IN',
+        timeFormatter: (timestamp: number) => {
+          return new Date(timestamp * 1000).toLocaleString('en-US', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          }) + ' IST';
+        }
       },
       grid: {
         vertLines: { color: 'rgba(255, 255, 255, 0.02)' },
@@ -319,6 +386,7 @@ export default function App() {
         borderColor: 'rgba(255, 255, 255, 0.06)',
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: istTickMarkFormatter,
       },
     });
     mainChartRef.current = mainChart;
@@ -391,6 +459,21 @@ export default function App() {
           textColor: '#8b949e',
           fontSize: 11,
         },
+        localization: {
+          locale: 'en-IN',
+          timeFormatter: (timestamp: number) => {
+            return new Date(timestamp * 1000).toLocaleString('en-US', {
+              timeZone: 'Asia/Kolkata',
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false
+            }) + ' IST';
+          }
+        },
         grid: {
           vertLines: { color: 'rgba(255, 255, 255, 0.02)' },
           horzLines: { color: 'rgba(255, 255, 255, 0.02)' },
@@ -402,6 +485,7 @@ export default function App() {
         timeScale: {
           borderColor: 'rgba(255, 255, 255, 0.06)',
           timeVisible: true,
+          tickMarkFormatter: istTickMarkFormatter,
         },
       });
       rsiChartRef.current = rsiChart;
@@ -468,13 +552,15 @@ export default function App() {
 
   const formatDate = (timestampMs: number) => {
     return new Date(timestampMs).toLocaleString('en-US', {
+      timeZone: 'Asia/Kolkata',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
-    });
+      second: '2-digit',
+      hour12: false
+    }) + ' IST';
   };
 
   return (
@@ -875,6 +961,37 @@ export default function App() {
             <h2 className="section-title">
               <span className="section-icon">📈</span> Interactive Market Analysis & Technical Pipeline
             </h2>
+            <div className="market-feed-status">
+              {marketStatus ? (
+                marketStatus.feed_active ? (
+                  <div className="feed-badge feed-live">
+                    <span className="feed-pulse-dot"></span>
+                    <Wifi size={13} />
+                    <span>LIVE</span>
+                  </div>
+                ) : marketStatus.status === 'starting' ? (
+                  <div className="feed-badge feed-connecting">
+                    <Radio size={13} />
+                    <span>CONNECTING...</span>
+                  </div>
+                ) : (
+                  <div className="feed-badge feed-error" title={marketStatus.error || 'Feed error'}>
+                    <WifiOff size={13} />
+                    <span>FEED ERROR</span>
+                  </div>
+                )
+              ) : (
+                <div className="feed-badge feed-connecting">
+                  <Radio size={13} />
+                  <span>CONNECTING...</span>
+                </div>
+              )}
+              {marketStatus?.last_fetch && (
+                <span className="feed-freshness">
+                  Updated {Math.round((Date.now() / 1000) - marketStatus.last_fetch)}s ago
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="panel chart-container-panel" id="tradingview-chart-panel">
@@ -897,6 +1014,25 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label className="badge-label" htmlFor="timeframe-select" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Timeframe</label>
+                  <select 
+                    id="timeframe-select" 
+                    className="select-input" 
+                    style={{ width: '90px', padding: '6px 12px', fontSize: '12px' }}
+                    value={timeframe}
+                    onChange={(e) => setTimeframe(e.target.value)}
+                  >
+                    <option value="1m">1 min</option>
+                    <option value="5m">5 min</option>
+                    <option value="15m">15 min</option>
+                    <option value="30m">30 min</option>
+                    <option value="1h">1 hour</option>
+                    <option value="4h">4 hours</option>
+                    <option value="1d">1 day</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <label className="badge-label" htmlFor="candle-count-select" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Candles</label>
                   <select 
                     id="candle-count-select" 
@@ -910,6 +1046,8 @@ export default function App() {
                     <option value={100}>100</option>
                     <option value={150}>150</option>
                     <option value={200}>200</option>
+                    <option value={500}>500</option>
+                    <option value={1000}>1000</option>
                   </select>
                 </div>
               </div>

@@ -61,3 +61,6 @@ Desktop.ini
 
 # Archive
 archive/
+
+# Documentation (local only)
+doc/

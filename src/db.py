@@ -41,29 +41,39 @@ def initialize_db() -> bool:
             # Enable WAL mode for high performance concurrent read/writes
             cursor.execute("PRAGMA journal_mode=WAL;")
             
+            # Table Migration: check if timeframe column exists in candles table
+            cursor.execute("PRAGMA table_info(candles);")
+            columns = [row["name"] for row in cursor.fetchall()]
+            if columns and "timeframe" not in columns:
+                logger.warning("Upgrading DB schema: dropping old candles and indicators tables.")
+                cursor.execute("DROP TABLE IF EXISTS candles;")
+                cursor.execute("DROP TABLE IF EXISTS indicators;")
+            
             # 1. Candles Table (Historical OHLCV data)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS candles (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     symbol TEXT NOT NULL,
+                    timeframe TEXT NOT NULL DEFAULT '15m',
                     timestamp INTEGER NOT NULL,
                     open REAL NOT NULL,
                     high REAL NOT NULL,
                     low REAL NOT NULL,
                     close REAL NOT NULL,
                     volume REAL NOT NULL,
-                    UNIQUE(symbol, timestamp) ON CONFLICT REPLACE
+                    UNIQUE(symbol, timeframe, timestamp) ON CONFLICT REPLACE
                 );
             """)
             
-            # Index for faster retrieval by symbol and time
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_candles_symbol_time ON candles(symbol, timestamp DESC);")
+            # Index for faster retrieval by symbol, timeframe and time
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_candles_symbol_timeframe_time ON candles(symbol, timeframe, timestamp DESC);")
 
             # 2. Indicators Table (Stores calculated technical indicators)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS indicators (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     symbol TEXT NOT NULL,
+                    timeframe TEXT NOT NULL DEFAULT '15m',
                     timestamp INTEGER NOT NULL,
                     rsi REAL,
                     ema_fast REAL,
@@ -71,11 +81,11 @@ def initialize_db() -> bool:
                     bb_upper REAL,
                     bb_middle REAL,
                     bb_lower REAL,
-                    UNIQUE(symbol, timestamp) ON CONFLICT REPLACE
+                    UNIQUE(symbol, timeframe, timestamp) ON CONFLICT REPLACE
                 );
             """)
             
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_indicators_symbol_time ON indicators(symbol, timestamp DESC);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_indicators_symbol_timeframe_time ON indicators(symbol, timeframe, timestamp DESC);")
 
             # 3. Trades Table (Records bot trading execution details)
             cursor.execute("""
@@ -112,7 +122,7 @@ def initialize_db() -> bool:
         return False
 
 
-def save_candles(symbol: str, candles: List[Tuple[int, float, float, float, float, float]]) -> bool:
+def save_candles(symbol: str, candles: List[Tuple[int, float, float, float, float, float]], timeframe: str = "15m") -> bool:
     """
     Saves a list of candles to the database.
     Each candle tuple: (timestamp_ms, open, high, low, close, volume)
@@ -125,23 +135,23 @@ def save_candles(symbol: str, candles: List[Tuple[int, float, float, float, floa
             cursor = conn.cursor()
             cursor.execute("BEGIN TRANSACTION;")
             
-            # Prepare rows with symbol prefixed
-            rows = [(symbol, c[0], c[1], c[2], c[3], c[4], c[5]) for c in candles]
+            # Prepare rows with symbol and timeframe prefixed
+            rows = [(symbol, timeframe, c[0], c[1], c[2], c[3], c[4], c[5]) for c in candles]
             
             cursor.executemany("""
-                INSERT INTO candles (symbol, timestamp, open, high, low, close, volume)
-                VALUES (?, ?, ?, ?, ?, ?, ?);
+                INSERT INTO candles (symbol, timeframe, timestamp, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """, rows)
             
             cursor.execute("COMMIT;")
-            logger.debug(f"Saved {len(candles)} candles for {symbol} to database.")
+            logger.debug(f"Saved {len(candles)} candles for {symbol} ({timeframe}) to database.")
             return True
     except Exception as e:
         logger.error(f"Failed to save candles for {symbol}: {e}")
         return False
 
 
-def get_latest_candles(symbol: str, limit: int = 100) -> List[Dict[str, Any]]:
+def get_latest_candles(symbol: str, limit: int = 100, timeframe: str = "15m") -> List[Dict[str, Any]]:
     """
     Retrieves the most recent candles for a symbol, ordered from oldest to newest
     (suitable for technical indicator calculation).
@@ -152,20 +162,20 @@ def get_latest_candles(symbol: str, limit: int = 100) -> List[Dict[str, Any]]:
             cursor.execute("""
                 SELECT timestamp, open, high, low, close, volume
                 FROM candles
-                WHERE symbol = ?
+                WHERE symbol = ? AND timeframe = ?
                 ORDER BY timestamp DESC
                 LIMIT ?
-            """, (symbol, limit))
+            """, (symbol, timeframe, limit))
             
             rows = cursor.fetchall()
             # Reverse to return chronologically (oldest to newest)
             return [dict(row) for row in reversed(rows)]
     except Exception as e:
-        logger.error(f"Failed to retrieve latest candles for {symbol}: {e}")
+        logger.error(f"Failed to retrieve latest candles for {symbol} ({timeframe}): {e}")
         return []
 
 
-def save_indicators(symbol: str, timestamp: int, values: Dict[str, Optional[float]]) -> bool:
+def save_indicators(symbol: str, timestamp: int, values: Dict[str, Optional[float]], timeframe: str = "15m") -> bool:
     """
     Saves technical indicator calculations for a specific candle timestamp.
     """
@@ -173,9 +183,9 @@ def save_indicators(symbol: str, timestamp: int, values: Dict[str, Optional[floa
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO indicators (symbol, timestamp, rsi, ema_fast, ema_slow, bb_upper, bb_middle, bb_lower)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(symbol, timestamp) DO UPDATE SET
+                INSERT OR REPLACE INTO indicators (symbol, timeframe, timestamp, rsi, ema_fast, ema_slow, bb_upper, bb_middle, bb_lower)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(symbol, timeframe, timestamp) DO UPDATE SET
                     rsi = excluded.rsi,
                     ema_fast = excluded.ema_fast,
                     ema_slow = excluded.ema_slow,
@@ -184,6 +194,7 @@ def save_indicators(symbol: str, timestamp: int, values: Dict[str, Optional[floa
                     bb_lower = excluded.bb_lower;
             """, (
                 symbol,
+                timeframe,
                 timestamp,
                 values.get("rsi"),
                 values.get("ema_fast"),
@@ -194,7 +205,7 @@ def save_indicators(symbol: str, timestamp: int, values: Dict[str, Optional[floa
             ))
             return True
     except Exception as e:
-        logger.error(f"Failed to save indicators for {symbol} at {timestamp}: {e}")
+        logger.error(f"Failed to save indicators for {symbol} at {timestamp} ({timeframe}): {e}")
         return False
 
 
@@ -231,7 +242,7 @@ def log_trade(trade_data: Dict[str, Any]) -> bool:
         return False
 
 
-def get_strategy_data(symbol: str, limit: int = 100) -> Any:
+def get_strategy_data(symbol: str, limit: int = 100, timeframe: str = "15m") -> Any:
     """
     Retrieves merged candle and indicator data for a symbol as a pandas DataFrame,
     ordered chronologically (oldest to newest).
@@ -243,17 +254,17 @@ def get_strategy_data(symbol: str, limit: int = 100) -> Any:
                 SELECT c.timestamp, c.open, c.high, c.low, c.close, c.volume,
                        i.rsi, i.ema_fast, i.ema_slow, i.bb_upper, i.bb_middle, i.bb_lower
                 FROM candles c
-                LEFT JOIN indicators i ON c.symbol = i.symbol AND c.timestamp = i.timestamp
-                WHERE c.symbol = ?
+                LEFT JOIN indicators i ON c.symbol = i.symbol AND c.timeframe = i.timeframe AND c.timestamp = i.timestamp
+                WHERE c.symbol = ? AND c.timeframe = ?
                 ORDER BY c.timestamp DESC
                 LIMIT ?
             """
-            df = pd.read_sql_query(query, conn, params=(symbol, limit))
+            df = pd.read_sql_query(query, conn, params=(symbol, timeframe, limit))
             # Reverse to order chronologically (oldest to newest)
             df = df.iloc[::-1].reset_index(drop=True)
             return df
     except Exception as e:
-        logger.error(f"Failed to fetch merged strategy data for {symbol}: {e}")
+        logger.error(f"Failed to fetch merged strategy data for {symbol} ({timeframe}): {e}")
         return pd.DataFrame()
 
 
