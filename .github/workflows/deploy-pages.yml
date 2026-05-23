@@ -16,10 +16,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3973a6a06d9939e118128b6d26c6360c3d # v4.1.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -34,7 +34,7 @@ jobs:
         working-directory: dashboard/frontend
 
       - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@v4
+        uses: JamesIves/github-pages-deploy-action@65b5d2fb95409e0cad75dcc18af3d06e2510edd9 # v4.6.1
         with:
           folder: dashboard/frontend/dist
           branch: gh-pages
