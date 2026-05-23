@@ -237,9 +237,10 @@ market_feed = MarketDataFeed()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI lifespan: start live data feed on startup, stop on shutdown."""
-    market_feed.start()
+    # In unified production deployments, the pipeline scheduler handles market ingestion
+    # and writes to the shared DB. We disable the API's duplicate feed to prevent Binance IP bans.
+    logger.info("MarketDataFeed background thread disabled (scheduler handles ingestion).")
     yield
-    market_feed.stop()
 
 
 app = FastAPI(

@@ -8,17 +8,32 @@ logger = setup_logging("OneGuard.Main")
 
 def start_backend():
     """Starts the algorithmic trading pipeline scheduler."""
+    try:
+        from src.db import engine
+        engine.dispose()
+    except Exception:
+        pass
     from src.pipeline import main as run_pipeline
     logger.info("Starting Backend Trading Pipeline...")
     run_pipeline()
 
 def start_dashboard():
     """Starts the FastAPI web server serving the React dashboard and API."""
+    try:
+        from src.db import engine
+        engine.dispose()
+    except Exception:
+        pass
     logger.info("Starting FastAPI Dashboard...")
     uvicorn.run("dashboard.api:app", host="0.0.0.0", port=8000, log_level="info")
 
 def start_telegram():
     """Starts the Telegram bot polling process."""
+    try:
+        from src.db import engine
+        engine.dispose()
+    except Exception:
+        pass
     if not settings.telegram_token:
         logger.warning("No Telegram token found. Telegram bot will not be started.")
         return
