@@ -944,6 +944,110 @@
                 </div>
             </section>
 
+            <!-- Phase 5 -->
+            <section class="phase-card" data-status="inprogress" onclick="openPhaseDetails('phase5')">
+                <div>
+                    <div class="phase-header">
+                        <div>
+                            <h2 class="phase-title">Phase 5: Continuous Sandbox Paper Trading</h2>
+                            <p class="phase-timeline">Milestone Timeline: Day 8-15</p>
+                        </div>
+                        <span class="status-badge status-inprogress">In Progress</span>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p5-1">
+                            <span class="task-text">Configure CCXT to sandbox/testnet mode and verify clock sync.</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p5-2">
+                            <span class="task-text">Run continuous pipeline scheduler to ingest and trade dry-runs.</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p5-3">
+                            <span class="task-text">Log simulated trades, fees, and metrics to SQLite trade ledger.</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="phase-footer">
+                    <div>
+                        <span class="phase-progress-text" id="p5-progress-text">Progress: 0%</span>
+                        <div class="phase-progress-bar" style="margin-top: 4px;">
+                            <div class="phase-progress-fill" id="p5-progress-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <span class="click-hint">Click for details →</span>
+                </div>
+            </section>
+
+            <!-- Phase 6 -->
+            <section class="phase-card" data-status="planned" onclick="openPhaseDetails('phase6')">
+                <div>
+                    <div class="phase-header">
+                        <div>
+                            <h2 class="phase-title">Phase 6: Strategy Selection & Validation</h2>
+                            <p class="phase-timeline">Milestone Timeline: Week 2-4</p>
+                        </div>
+                        <span class="status-badge status-planned">Planned</span>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p6-1">
+                            <span class="task-text">Run statistical performance analysis on paper trade results.</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p6-2">
+                            <span class="task-text">Assert win rate &gt; 55% and average profit &gt; 0.4% post-slippage.</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="phase-footer">
+                    <div>
+                        <span class="phase-progress-text" id="p6-progress-text">Progress: 0%</span>
+                        <div class="phase-progress-bar" style="margin-top: 4px;">
+                            <div class="phase-progress-fill" id="p6-progress-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <span class="click-hint">Click for details →</span>
+                </div>
+            </section>
+
+            <!-- Phase 7 -->
+            <section class="phase-card" data-status="planned" onclick="openPhaseDetails('phase7')">
+                <div>
+                    <div class="phase-header">
+                        <div>
+                            <h2 class="phase-title">Phase 7: Go Live</h2>
+                            <p class="phase-timeline">Milestone Timeline: Week 4+</p>
+                        </div>
+                        <span class="status-badge status-planned">Planned</span>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p7-1">
+                            <span class="task-text">Perform live API permissions check (withdrawal disabled).</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p7-2">
+                            <span class="task-text">Deploy daemonized process to VPS host for 24/7 runtime.</span>
+                        </li>
+                        <li class="task-item">
+                            <input type="checkbox" class="task-checkbox" id="t-p7-3">
+                            <span class="task-text">Begin small scaling capital setup with weekly realized loss halts.</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="phase-footer">
+                    <div>
+                        <span class="phase-progress-text" id="p7-progress-text">Progress: 0%</span>
+                        <div class="phase-progress-bar" style="margin-top: 4px;">
+                            <div class="phase-progress-fill" id="p7-progress-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <span class="click-hint">Click for details →</span>
+                </div>
+            </section>
+
         </main>
 
         <!-- SIDEBAR DATA PANELS -->
@@ -1309,6 +1413,85 @@ def read_metrics():
                         <li><strong>Sandbox Testing First</strong>: All Telegram alert triggers must be verified against a test chat before wiring into the live trading loop.</li>
                     </ul>
                 `
+            },
+            phase5: {
+                title: "Phase 5: Continuous Sandbox Paper Trading",
+                subtitle: "Dry-run execution loop on Binance Testnet with live telemetry",
+                overview: `
+                    <div class="sub-section-title">Milestones & Goals</div>
+                    <ul class="modal-list">
+                        <li><strong>Binance Testnet Setup</strong>: Shift execution engine to run continuously on Binance Testnet (sandbox mode) with virtual funds.</li>
+                        <li><strong>Simulated Trade Accounting</strong>: Record all sandbox trade logs, commission fees, slippage metrics, and exit indicators in SQLite database.</li>
+                        <li><strong>System Clock Calibration</strong>: Verify local system time offset dynamically against exchange servers to prevent signature validation window expiration issues.</li>
+                    </ul>
+                `,
+                tech: `
+                    <div class="sub-section-title">Execution Environment</div>
+                    <div class="tech-pill-container">
+                        <span class="tech-pill">Binance Testnet</span>
+                        <span class="tech-pill">APScheduler Continuous</span>
+                        <span class="tech-pill">CCXT Sandbox Engine</span>
+                        <span class="tech-pill">Telemetry Alerting</span>
+                    </div>
+                `,
+                guardrails: `
+                    <div class="warning-box">
+                        <div class="warning-box-title">🛡️ Paper Trading Validation Criteria</div>
+                        <p>Verify that the pipeline runs uninterrupted with zero runtime crashes or memory leaks, ensuring all risk management rules (drawdowns, cooldowns) execute properly.</p>
+                    </div>
+                `
+            },
+            phase6: {
+                title: "Phase 6: Strategy Selection & Validation",
+                subtitle: "Statistical performance metrics validation before capital deployment",
+                overview: `
+                    <div class="sub-section-title">Statistical Assertions</div>
+                    <ul class="modal-list">
+                        <li><strong>Win Rate Assessment</strong>: Confirm that the best performing strategy maintains a win rate of > 55% over a multi-week data series.</li>
+                        <li><strong>Profit Margin Validation</strong>: Confirm average net profit per trade remains > 0.4% after accounting for exchange trading fees and slippage.</li>
+                        <li><strong>Max Drawdown Assertion</strong>: Validate that total drawdown stays strictly under 8%.</li>
+                    </ul>
+                `,
+                tech: `
+                    <div class="tech-pill-container">
+                        <span class="tech-pill">Pandas Data Analysis</span>
+                        <span class="tech-pill">PnL Analytics Module</span>
+                        <span class="tech-pill">Profit Factor Formula</span>
+                        <span class="tech-pill">Win Rate Metrics</span>
+                    </div>
+                `,
+                guardrails: `
+                    <div class="warning-box">
+                        <div class="warning-box-title">📈 Statistical Success Gate</div>
+                        <p>Only strategies meeting the required mathematical criteria are authorized to be transitioned into the production scaling setup.</p>
+                    </div>
+                `
+            },
+            phase7: {
+                title: "Phase 7: Go Live",
+                subtitle: "Live capital deployment with scaling parameters and daemonization",
+                overview: `
+                    <div class="sub-section-title">Deployment and Controls</div>
+                    <ul class="modal-list">
+                        <li><strong>API Safety Inspection</strong>: Live verification that exchange API keys have strictly Read+Trade permissions with withdrawals disabled.</li>
+                        <li><strong>VPS Daemonization</strong>: Deploying the scheduler backend to a VPS with auto-recovery and process supervisor (e.g. systemd or pm2).</li>
+                        <li><strong>Weekly Drawdown Halts</strong>: Configure live trading budgets starting with a small initial allocation and automated drawdown triggers.</li>
+                    </ul>
+                `,
+                tech: `
+                    <div class="tech-pill-container">
+                        <span class="tech-pill">VPS Hosting / Ubuntu</span>
+                        <span class="tech-pill">Systemd Service Daemon</span>
+                        <span class="tech-pill">Production API Credentials</span>
+                        <span class="tech-pill">Dynamic Capital Scaling</span>
+                    </div>
+                `,
+                guardrails: `
+                    <div class="warning-box" style="background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.35);">
+                        <div class="warning-box-title" style="color: #ef4444;">🚨 Strictly Forbidden Live Actions</div>
+                        <p>Under no circumstances should the live bot run on credentials with withdrawal permissions enabled. Keep weekly drawdowns capped.</p>
+                    </div>
+                `
             }
         };
 
@@ -1408,6 +1591,30 @@ def read_metrics():
             const p4Percent = Math.round((p4Checked / (p4Checkboxes.length || 1)) * 100);
             document.getElementById('p4-progress-text').innerText = 'Progress: ' + p4Percent + '%';
             document.getElementById('p4-progress-fill').style.width = p4Percent + '%';
+
+            // Phase 5 progress
+            const p5Checkboxes = document.querySelectorAll('#phases-container section:nth-of-type(5) .task-checkbox');
+            let p5Checked = 0;
+            p5Checkboxes.forEach(box => { if (box.checked) p5Checked++; });
+            const p5Percent = Math.round((p5Checked / (p5Checkboxes.length || 1)) * 100);
+            document.getElementById('p5-progress-text').innerText = 'Progress: ' + p5Percent + '%';
+            document.getElementById('p5-progress-fill').style.width = p5Percent + '%';
+
+            // Phase 6 progress
+            const p6Checkboxes = document.querySelectorAll('#phases-container section:nth-of-type(6) .task-checkbox');
+            let p6Checked = 0;
+            p6Checkboxes.forEach(box => { if (box.checked) p6Checked++; });
+            const p6Percent = Math.round((p6Checked / (p6Checkboxes.length || 1)) * 100);
+            document.getElementById('p6-progress-text').innerText = 'Progress: ' + p6Percent + '%';
+            document.getElementById('p6-progress-fill').style.width = p6Percent + '%';
+
+            // Phase 7 progress
+            const p7Checkboxes = document.querySelectorAll('#phases-container section:nth-of-type(7) .task-checkbox');
+            let p7Checked = 0;
+            p7Checkboxes.forEach(box => { if (box.checked) p7Checked++; });
+            const p7Percent = Math.round((p7Checked / (p7Checkboxes.length || 1)) * 100);
+            document.getElementById('p7-progress-text').innerText = 'Progress: ' + p7Percent + '%';
+            document.getElementById('p7-progress-fill').style.width = p7Percent + '%';
         }
 
         // Run calculations on startup

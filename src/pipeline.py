@@ -10,7 +10,7 @@ from src.db import initialize_db, save_candles, get_latest_candles, save_indicat
 from src.indicators import calculate_technical_indicators
 from src.strategies import evaluate_all_strategies
 from src.execution import check_and_execute_exits, execute_market_order
-from src.telemetry import alert_bot_startup, alert_system_error
+from src.telemetry import alert_bot_startup, alert_system_error, alert_clock_drift
 
 logger = logging.getLogger("OneGuard.Pipeline")
 
@@ -48,6 +48,26 @@ def run_pipeline_cycle(exchange: ccxt.Exchange):
     calculates technical indicators, and saves indicator results.
     """
     logger.info("Starting pipeline ingestion cycle...")
+    
+    # Safety Check: check clock synchronization
+    try:
+        start_time = time.time()
+        exchange_time = exchange.fetch_time()
+        roundtrip = (time.time() - start_time) * 1000
+        system_time_ms = int(time.time() * 1000)
+        time_diff = system_time_ms - exchange_time
+        
+        logger.info(f"System Clock Offset: {time_diff} ms (Roundtrip: {roundtrip:.1f}ms)")
+        
+        if abs(time_diff) > 1000:
+            logger.error(
+                f"CLOCK DRIFT DETECTED: Local system clock offset is {time_diff}ms. "
+                "Exceeds 1000ms threshold. Trading execution suspended to prevent signature errors."
+            )
+            alert_clock_drift(time_diff)
+            return
+    except Exception as e:
+        logger.error(f"Failed to verify clock synchronization: {e}")
     
     # Safety Check: check if emergency halt is active
     if settings.emergency_halt:
@@ -162,11 +182,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # Configure main module logging level
-    logging.basicConfig(level=logging.INFO)
+    from src.config import setup_logging
+    setup_logging("OneGuard.Pipeline")
     
     # Ensure database is initialized
     if not initialize_db():
         logger.critical("Database initialization failed. Exiting.")
+        sys.exit(1)
+        
+    # Validate configurations
+    if not settings.validate():
+        logger.critical("Configuration validation failed. Exiting.")
         sys.exit(1)
         
     if args.once:

@@ -42,6 +42,7 @@ venv.bak/
 *.sqlite
 *.sqlite3
 *.log
+logs/
 
 # IDEs/Editors
 .vscode/

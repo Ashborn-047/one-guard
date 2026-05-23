@@ -19,6 +19,7 @@ from src.risk import (
 from src.strategies.rsi import generate_rsi_signal
 from src.strategies.bb import generate_bb_signal
 from src.strategies.ema import generate_ema_signal
+import dashboard.api
 
 class TestOneGuardRiskAndStrategies(unittest.TestCase):
     
@@ -136,6 +137,7 @@ class TestOneGuardRiskAndStrategies(unittest.TestCase):
 
     def test_loss_cooldown(self):
         self.set_loss_cooldown_minutes(30)
+        self.set_weekly_drawdown_limit(15.0)
         
         # Log a losing trade that ended right now
         now_ms = int(time.time() * 1000)

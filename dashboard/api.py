@@ -13,17 +13,17 @@ from fastapi.middleware.cors import CORSMiddleware
 # Add project root to path to resolve src imports correctly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.config import settings
+from src.config import settings, setup_logging
 from src.db import get_db_connection, get_strategy_data, get_latest_candles, initialize_db, save_candles, save_indicators
 from src.indicators import calculate_technical_indicators
 from src.risk import get_active_positions, get_weekly_pnl
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("OneGuard.API")
+logger = setup_logging("OneGuard.API")
 
 # Initialize database schema
 initialize_db()
+settings.validate()
 
 # ---------------------------------------------------------------------------
 # Live Market Data Feed — Background Ingestion Engine
@@ -357,6 +357,7 @@ def read_status():
     """
     Returns bot status, execution mode, emergency halt switch, and risk settings.
     """
+    is_mock = not (settings.api_key and settings.secret_key)
     return {
         "is_live": settings.is_live,
         "emergency_halt": settings.emergency_halt,
@@ -365,7 +366,8 @@ def read_status():
         "weekly_drawdown_limit": settings.weekly_drawdown_limit,
         "loss_cooldown_minutes": settings.loss_cooldown_minutes,
         "stop_loss_target": 2.0,
-        "take_profit_target": 4.0
+        "take_profit_target": 4.0,
+        "is_mock": is_mock
     }
 
 @app.get("/api/metrics")

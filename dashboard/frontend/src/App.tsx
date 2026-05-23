@@ -21,6 +21,7 @@ interface BotStatus {
   loss_cooldown_minutes: number;
   stop_loss_target: number;
   take_profit_target: number;
+  is_mock?: boolean;
 }
 
 interface PerformanceMetrics {
@@ -163,6 +164,10 @@ export default function App() {
 
   const handleToggleExecutionMode = async () => {
     if (!status) return;
+    if (status.is_mock) {
+      showToastMessage('Live trading requires Binance API credentials configured in .env', 'error');
+      return;
+    }
     const newIsLive = !status.is_live;
     try {
       const res = await fetch(`${API_BASE_URL}/api/settings`, {
@@ -581,10 +586,25 @@ export default function App() {
           <div className="status-badge clickable" id="execution-mode-badge" onClick={handleToggleExecutionMode} title="Click to toggle execution mode">
             <span className="badge-label">Execution Mode</span>
             {status ? (
-              <span className={`badge-value ${status.is_live ? 'red' : 'orange'}`}>
-                <span className="pulse-dot"></span>
-                {status.is_live ? 'LIVE TRADING' : 'SANDBOX MOCK'}
-              </span>
+              status.is_mock ? (
+                <span 
+                  className="badge-value"
+                  style={{
+                    color: '#58a6ff',
+                    background: 'rgba(88, 166, 255, 0.1)',
+                    border: '1px solid rgba(88, 166, 255, 0.2)',
+                    boxShadow: '0 0 8px rgba(88, 166, 255, 0.25)'
+                  }}
+                >
+                  <span className="pulse-dot" style={{ backgroundColor: '#58a6ff' }}></span>
+                  MOCK SIMULATOR
+                </span>
+              ) : (
+                <span className={`badge-value ${status.is_live ? 'red' : 'orange'}`}>
+                  <span className="pulse-dot"></span>
+                  {status.is_live ? 'LIVE TRADING' : 'SANDBOX MOCK'}
+                </span>
+              )
             ) : (
               <span className="badge-value">LOADING</span>
             )}

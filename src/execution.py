@@ -4,7 +4,7 @@ import traceback
 from typing import Dict, Any, Optional
 import ccxt
 from src.config import settings
-from src.db import get_db_connection, log_trade
+from src.db import get_db_connection, log_trade, log_to_active_trade_file
 from src.risk import (
     verify_trade_execution_safety,
     calculate_position_size,
@@ -75,13 +75,32 @@ def execute_market_order(
             
         logger.info(f"PLACING MARKET ORDER: {side_upper} {qty_formatted} {symbol} (Strategy: {strategy})")
         
-        # 4. Place order via CCXT
-        if side_upper == "BUY":
-            order = exchange.create_market_buy_order(symbol, qty_formatted)
+        # 4. Place order (simulated if keys are missing)
+        is_mock_execution = not (exchange.apiKey and exchange.secret)
+        
+        if is_mock_execution:
+            trade_timestamp = int(time.time() * 1000)
+            logger.info(f"[MOCK EXECUTION] Simulating {side_upper} {qty_formatted} {symbol} locally.")
+            order = {
+                'id': f"mock_{trade_timestamp}",
+                'timestamp': trade_timestamp,
+                'datetime': exchange.iso8601(trade_timestamp),
+                'symbol': symbol,
+                'side': side_upper.lower(),
+                'price': current_price,
+                'amount': qty_formatted,
+                'filled': qty_formatted,
+                'remaining': 0.0,
+                'status': 'closed',
+                'cost': qty_formatted * current_price,
+                'fee': {'cost': qty_formatted * current_price * 0.001, 'currency': 'USDT'}
+            }
         else:
-            order = exchange.create_market_sell_order(symbol, qty_formatted)
-            
-        logger.info(f"Order executed successfully on exchange. ID: {order.get('id')}")
+            if side_upper == "BUY":
+                order = exchange.create_market_buy_order(symbol, qty_formatted)
+            else:
+                order = exchange.create_market_sell_order(symbol, qty_formatted)
+            logger.info(f"Order executed successfully on exchange. ID: {order.get('id')}")
         
         # 5. Extract executed details (CCXT normalization fallbacks)
         filled_qty = order.get('filled', qty_formatted)
@@ -207,6 +226,13 @@ def check_and_execute_exits(exchange: ccxt.Exchange):
                 
             # 3. Calculate targets (2% Stop Loss, 4% Take Profit)
             stop_loss, take_profit = calculate_sl_tp("BUY", entry_price, sl_percent=0.02, tp_percent=0.04)
+            
+            # Log scan iteration to individual trade log
+            log_to_active_trade_file(
+                symbol,
+                f"Scan active position exit conditions - Current: {current_price:.2f} | "
+                f"Targets: Stop-Loss={stop_loss:.2f}, Take-Profit={take_profit:.2f}"
+            )
             
             # 4. Check boundaries
             triggered = False

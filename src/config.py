@@ -6,18 +6,51 @@ from dataclasses import dataclass
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Set up logging configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger("OneGuard.Config")
-
 # Root directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+def setup_logging(logger_name: str = "OneGuard") -> logging.Logger:
+    """
+    Configures the root logger with a RotatingFileHandler to logs/one_guard.log
+    and a StreamHandler to sys.stdout. Returns a logger instance.
+    """
+    logs_dir = BASE_DIR / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # Avoid adding duplicate handlers
+    has_rotating = any(h.__class__.__name__ == 'RotatingFileHandler' for h in root_logger.handlers)
+    if not has_rotating:
+        from logging.handlers import RotatingFileHandler
+        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        
+        # File Handler
+        file_handler = RotatingFileHandler(
+            str(logs_dir / "one_guard.log"),
+            maxBytes=5 * 1024 * 1024,  # 5MB
+            backupCount=5,
+            encoding="utf-8"
+        )
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.INFO)
+        root_logger.addHandler(file_handler)
+        
+        # Stream Handler
+        has_stream = any(h.__class__.__name__ == 'StreamHandler' and getattr(h, 'stream', None) == sys.stdout for h in root_logger.handlers)
+        if not has_stream:
+            stream_handler = logging.StreamHandler(sys.stdout)
+            stream_handler.setFormatter(formatter)
+            stream_handler.setLevel(logging.INFO)
+            root_logger.addHandler(stream_handler)
+            
+    return logging.getLogger(logger_name)
+
+# Initialize logging configuration immediately on config import
+setup_logging()
+logger = logging.getLogger("OneGuard.Config")
+
 
 # Load environment variables from .env file
 env_path = BASE_DIR / ".env"
@@ -127,7 +160,8 @@ class Config:
 
     @property
     def max_position_size(self) -> float:
-        return self._get_db_value("max_position_size", float(os.getenv("MAX_POSITION_SIZE", "10.0").strip()))
+        default_size = "2.4" if not (self.api_key and self.secret_key) else "10.0"
+        return self._get_db_value("max_position_size", float(os.getenv("MAX_POSITION_SIZE", default_size).strip()))
 
     @max_position_size.setter
     def max_position_size(self, val: float):
@@ -143,7 +177,8 @@ class Config:
 
     @property
     def weekly_drawdown_limit(self) -> float:
-        return self._get_db_value("weekly_drawdown_limit", float(os.getenv("WEEKLY_DRAWDOWN_LIMIT", "15.0").strip()))
+        default_limit = "1.2" if not (self.api_key and self.secret_key) else "15.0"
+        return self._get_db_value("weekly_drawdown_limit", float(os.getenv("WEEKLY_DRAWDOWN_LIMIT", default_limit).strip()))
 
     @weekly_drawdown_limit.setter
     def weekly_drawdown_limit(self, val: float):
@@ -186,6 +221,13 @@ class Config:
                 "CREDENTIAL WARNING: Binance API Key or Secret Key is missing from configuration. "
                 "Bot execution will fail on authenticated endpoints (like placing orders)."
             )
+            # Adjust default DB configurations if they are still at the live defaults (10.0 and 15.0)
+            if self._get_db_value("max_position_size", 10.0) == 10.0:
+                self.max_position_size = 2.4
+                logger.info("Mock Mode: Adjusted max_position_size to 2.4 USDT (20% of INR 1,000 budget).")
+            if self._get_db_value("weekly_drawdown_limit", 15.0) == 15.0:
+                self.weekly_drawdown_limit = 1.2
+                logger.info("Mock Mode: Adjusted weekly_drawdown_limit to 1.2 USDT (10% of INR 1,000 budget).")
         else:
             logger.info("Binance API credentials loaded successfully.")
 

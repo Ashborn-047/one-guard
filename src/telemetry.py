@@ -182,6 +182,21 @@ def alert_system_error(context: str, error: Exception) -> bool:
     return send_telegram_message(message)
 
 
+def alert_clock_drift(offset_ms: int) -> bool:
+    """
+    Sends a clock drift alert warning when the system clock drifts.
+    """
+    message = (
+        f"🛡️ *\\[OneGuard\\] ⚠️ CLOCK SYNC WARNING*\n"
+        f"Local host clock drifted by `{offset_ms} ms` from exchange server.\n"
+        f"Threshold: `1000 ms`\n"
+        f"Status: *PIPELINE CYCLE SUSPENDED* 🛑\n"
+        f"Please synchronize your system clock."
+    )
+    logger.warning(f"[TELEMETRY] Clock drift alert | offset={offset_ms} ms")
+    return send_telegram_message(message)
+
+
 def alert_bot_startup(mode: str, symbols: list) -> bool:
     """
     Sends a startup notification when the bot initializes.

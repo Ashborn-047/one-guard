@@ -209,6 +209,195 @@ def save_indicators(symbol: str, timestamp: int, values: Dict[str, Optional[floa
         return False
 
 
+def log_trade_to_csv(trade_data: Dict[str, Any]) -> bool:
+    """
+    Appends a trade execution record to logs/trades.csv or logs/trades_test.csv.
+    Creates the directory and file with headers if it does not exist.
+    """
+    try:
+        import csv
+        import datetime
+        
+        logs_dir = settings.db_path.parent / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Keep test database logging isolated from actual trade logs
+        if "test" in settings.db_file:
+            csv_path = logs_dir / "trades_test.csv"
+        else:
+            csv_path = logs_dir / "trades.csv"
+            
+        file_exists = csv_path.exists()
+        
+        headers = [
+            "Timestamp", "Date Time", "Symbol", "Strategy", "Side",
+            "Price", "Amount", "Cost", "Fee", "PnL", "Order ID"
+        ]
+        
+        ts = trade_data["timestamp"]
+        ts_sec = ts / 1000.0 if ts > 1e11 else ts
+        dt_str = datetime.datetime.fromtimestamp(ts_sec, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        
+        row = [
+            trade_data["timestamp"],
+            dt_str,
+            trade_data["symbol"],
+            trade_data["strategy"],
+            trade_data["side"],
+            trade_data["price"],
+            trade_data["amount"],
+            trade_data["cost"],
+            trade_data.get("fee") if trade_data.get("fee") is not None else "",
+            trade_data.get("pnl") if trade_data.get("pnl") is not None else "",
+            trade_data["order_id"]
+        ]
+        
+        with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if not file_exists or csv_path.stat().st_size == 0:
+                writer.writerow(headers)
+            writer.writerow(row)
+            
+        logger.info(f"TRADE EXCEL LOGGED: Saved trade {trade_data['order_id']} to {csv_path}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to log trade to CSV: {e}")
+        return False
+
+
+def get_active_position_buy_order_id(symbol: str) -> Optional[str]:
+    """
+    Returns the order_id of the active BUY trade for a symbol, if any.
+    We check if there is an active position (net amount > 0).
+    We fetch the latest BUY trade order_id for that symbol.
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            # First check if there is an active position (net amount > 0)
+            cursor.execute("""
+                SELECT SUM(CASE WHEN side = 'BUY' THEN amount ELSE -amount END) as net_amount
+                FROM trades
+                WHERE symbol = ?
+            """, (symbol,))
+            row = cursor.fetchone()
+            net_amount = float(row[0]) if row and row[0] is not None else 0.0
+            
+            if net_amount > 1e-6:
+                # Get the order_id of the most recent BUY order
+                cursor.execute("""
+                    SELECT order_id 
+                    FROM trades 
+                    WHERE symbol = ? AND side = 'BUY' 
+                    ORDER BY timestamp DESC 
+                    LIMIT 1
+                """, (symbol,))
+                buy_row = cursor.fetchone()
+                if buy_row:
+                    return buy_row[0]
+    except Exception as e:
+        logger.error(f"Error getting active position buy order ID for {symbol}: {e}")
+    return None
+
+
+def log_trade_to_individual_files(trade_data: Dict[str, Any]) -> bool:
+    """
+    Appends a trade execution record to individual logs/trades/trade_<symbol>_<buy_order_id>.csv and .log.
+    If it is a BUY, it starts a new file. If it is a SELL, it appends to the corresponding files.
+    """
+    try:
+        import csv
+        import datetime
+        import time
+        
+        symbol = trade_data["symbol"]
+        symbol_clean = symbol.replace("/", "_")
+        side = trade_data["side"]
+        
+        logs_dir = settings.db_path.parent / "logs" / "trades"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Determine the buy_order_id for this trade lifecycle
+        if side == "BUY":
+            buy_order_id = trade_data["order_id"]
+        else:
+            buy_order_id = get_active_position_buy_order_id(symbol)
+            if not buy_order_id:
+                buy_order_id = f"unknown_{int(time.time())}"
+                
+        # Handle test files separately
+        test_suffix = "_test" if "test" in settings.db_file else ""
+        
+        base_filename = f"trade_{symbol_clean}_{buy_order_id}{test_suffix}"
+        csv_path = logs_dir / f"{base_filename}.csv"
+        log_path = logs_dir / f"{base_filename}.log"
+        
+        # 1. Log to CSV
+        file_exists = csv_path.exists()
+        headers = [
+            "Timestamp", "Date Time", "Symbol", "Strategy", "Side",
+            "Price", "Amount", "Cost", "Fee", "PnL", "Order ID"
+        ]
+        
+        ts = trade_data["timestamp"]
+        ts_sec = ts / 1000.0 if ts > 1e11 else ts
+        dt_str = datetime.datetime.fromtimestamp(ts_sec, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        
+        row = [
+            trade_data["timestamp"],
+            dt_str,
+            trade_data["symbol"],
+            trade_data["strategy"],
+            trade_data["side"],
+            trade_data["price"],
+            trade_data["amount"],
+            trade_data["cost"],
+            trade_data.get("fee") if trade_data.get("fee") is not None else "",
+            trade_data.get("pnl") if trade_data.get("pnl") is not None else "",
+            trade_data["order_id"]
+        ]
+        
+        with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if not file_exists or csv_path.stat().st_size == 0:
+                writer.writerow(headers)
+            writer.writerow(row)
+            
+        # 2. Log to log file
+        log_message = f"{dt_str} [{side}] {symbol} - Executed {side} order of {trade_data['amount']} at price {trade_data['price']}. Strategy: {trade_data['strategy']}, Cost: {trade_data['cost']}, Fee: {trade_data.get('fee')}, PnL: {trade_data.get('pnl')}, Order ID: {trade_data['order_id']}\n"
+        with open(log_path, mode="a", encoding="utf-8") as f:
+            f.write(log_message)
+            
+        logger.info(f"TRADE INDIVIDUAL LOGGED: Saved trade details to {csv_path} and {log_path}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to log trade to individual files: {e}")
+        return False
+
+
+def log_to_active_trade_file(symbol: str, message: str) -> None:
+    """
+    Appends a custom log message to the log file of the currently active trade for a symbol, if any.
+    """
+    try:
+        import datetime
+        buy_order_id = get_active_position_buy_order_id(symbol)
+        if buy_order_id:
+            symbol_clean = symbol.replace("/", "_")
+            test_suffix = "_test" if "test" in settings.db_file else ""
+            base_filename = f"trade_{symbol_clean}_{buy_order_id}{test_suffix}"
+            
+            logs_dir = settings.db_path.parent / "logs" / "trades"
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            log_path = logs_dir / f"{base_filename}.log"
+            
+            dt_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            with open(log_path, mode="a", encoding="utf-8") as f:
+                f.write(f"{dt_str} [INFO] {message}\n")
+    except Exception as e:
+        pass
+
+
 def log_trade(trade_data: Dict[str, Any]) -> bool:
     """
     Logs an executed order into the database.
@@ -236,6 +425,13 @@ def log_trade(trade_data: Dict[str, Any]) -> bool:
                 f"TRADE LOGGED: {trade_data['side']} {trade_data['amount']} {trade_data['symbol']} "
                 f"at {trade_data['price']} | PnL: {trade_data.get('pnl')}"
             )
+            
+            # Log to Excel-compatible CSV file
+            log_trade_to_csv(trade_data)
+            
+            # Log to individual trade files (both log and CSV)
+            log_trade_to_individual_files(trade_data)
+            
             return True
     except Exception as e:
         logger.error(f"Failed to log trade {trade_data.get('order_id')}: {e}")
