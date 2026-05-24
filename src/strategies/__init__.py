@@ -26,7 +26,12 @@ def evaluate_all_strategies(symbol: str) -> Dict[str, str]:
             "EMA": "HOLD"
         }
         
-    rsi_signal = generate_rsi_signal(df)
+    # Use looser thresholds in sandbox for quick signals, otherwise standard 30/70
+    from src.config import settings
+    if settings.is_sandbox:
+        rsi_signal = generate_rsi_signal(df, rsi_lower=45.0, rsi_upper=55.0)
+    else:
+        rsi_signal = generate_rsi_signal(df, rsi_lower=30.0, rsi_upper=70.0)
     bb_signal = generate_bb_signal(df)
     ema_signal = generate_ema_signal(df)
     
