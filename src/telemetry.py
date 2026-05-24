@@ -78,7 +78,7 @@ def alert_trade_entry(symbol: str, side: str, quantity: float, price: float, str
         f"🛡️ *\\[OneGuard\\] TRADE ENTRY*\n"
         f"{emoji} *{side.upper()}*  `{symbol}`\n"
         f"Strategy : `{strategy}`\n"
-        f"Qty      : `{quantity}`\n"
+        f"Qty      : `{quantity:.8f}`\n"
         f"Price    : `~₹{inr_price:,.2f} INR`"
     )
     logger.info(f"[TELEMETRY] Trade entry alert: {side} {symbol} via {strategy}")
@@ -119,7 +119,7 @@ def alert_trade_exit(
         f"🛡️ *\\[OneGuard\\] TRADE EXIT*\n"
         f"{emoji} *{side.upper()}*  `{symbol}`\n"
         f"Strategy : `{strategy}`  |  Reason: {reason_label}\n"
-        f"Qty      : `{quantity}`\n"
+        f"Qty      : `{quantity:.8f}`\n"
         f"Price    : `~₹{inr_price:,.2f} INR`\n"
         f"PnL      : `{pnl_display}`"
     )
