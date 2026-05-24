@@ -76,8 +76,14 @@ def execute_market_order(
             
         logger.info(f"PLACING MARKET ORDER: {side_upper} {qty_formatted} {symbol} (Strategy: {strategy})")
         
-        # 4. Place order (simulated if keys are missing)
-        is_mock_execution = not (exchange.apiKey and exchange.secret)
+        # 4. Place order (simulated if keys are missing or placeholders)
+        is_mock_execution = (
+            not (exchange.apiKey and exchange.secret) or
+            "your_binance_api_key" in exchange.apiKey or
+            "your_binance_secret" in exchange.secret or
+            "your_api_key" in exchange.apiKey or
+            "your_secret_key" in exchange.secret
+        )
         
         if is_mock_execution:
             trade_timestamp = int(time.time() * 1000)

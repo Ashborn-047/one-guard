@@ -37,8 +37,8 @@ settings.validate()
 # ---------------------------------------------------------------------------
 
 TRADING_SYMBOLS = ["BTC/USDT", "ETH/USDT"]
-INGESTION_TIMEFRAME = "15m"
-INGESTION_INTERVAL_SECONDS = 30
+INGESTION_TIMEFRAME = "1m"
+INGESTION_INTERVAL_SECONDS = 10
 INGESTION_CANDLE_LIMIT = 1000  # Initial backfill depth (covers ~10 days of 15m candles)
 
 
@@ -62,7 +62,7 @@ def recalculate_and_save_all_indicators(symbol: str, limit: int = 1000, timefram
         ema_slow_series = ta.ema(close=df["close"], length=21)
         
         # 3. Compute Bollinger Bands (20, 2)
-        bb_df = ta.bbands(close=df["close"], length=20, std=2)
+        bb_df = ta.bbands(close=df["close"], length=20, std=1)
         if bb_df is None or bb_df.empty:
             return
             
@@ -588,9 +588,15 @@ def sync_exchange_trades():
     """
     global _last_trade_sync_time
     
-    # Check if exchange API keys are present
-    if not settings.api_key or not settings.secret_key:
-        logger.info("Exchange sync skipped: API credentials are not configured.")
+    # Check if exchange API keys are present and not placeholders
+    is_placeholder = (
+        "your_binance_api_key" in settings.api_key or
+        "your_binance_secret" in settings.secret_key or
+        "your_api_key" in settings.api_key or
+        "your_secret_key" in settings.secret_key
+    )
+    if not settings.api_key or not settings.secret_key or is_placeholder:
+        logger.info("Exchange sync skipped: API credentials are not configured or are placeholders.")
         return
 
     exchange = get_exchange_client()

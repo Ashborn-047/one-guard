@@ -17,7 +17,7 @@ logger = logging.getLogger("OneGuard.Pipeline")
 
 # Pinned symbols and timeframe from masterplan
 TRADING_SYMBOLS = ["BTC/USDT", "ETH/USDT"]
-TIMEFRAME = "15m"
+TIMEFRAME = "1m"
 CANDLE_LIMIT = 100
 
 def initialize_exchange() -> ccxt.Exchange:
@@ -160,17 +160,17 @@ def start_scheduler():
     run_pipeline_cycle(exchange)
     
     scheduler = BlockingScheduler()
-    # Schedule to execute at the start of every 15-minute interval (00, 15, 30, 45)
+    # Schedule to execute every minute
     scheduler.add_job(
         run_pipeline_cycle,
         trigger="cron",
-        minute="0,15,30,45",
+        minute="*",
         args=[exchange],
         id="data_pipeline_job",
         name="Fetch Candlestick and Compute Indicators"
     )
     
-    logger.info("Pipeline Scheduler started. Running every 15 minutes...")
+    logger.info("Pipeline Scheduler started. Running every 1 minute...")
     alert_bot_startup(settings.mode, TRADING_SYMBOLS)
     try:
         scheduler.start()

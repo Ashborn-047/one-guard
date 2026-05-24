@@ -246,10 +246,16 @@ class Config:
             )
 
         # 3. Check Exchange Credentials
-        if not self.api_key or not self.secret_key:
+        is_placeholder = (
+            "your_binance_api_key" in self.api_key or
+            "your_binance_secret" in self.secret_key or
+            "your_api_key" in self.api_key or
+            "your_secret_key" in self.secret_key
+        )
+        if not self.api_key or not self.secret_key or is_placeholder:
             logger.warning(
-                "CREDENTIAL WARNING: Binance API Key or Secret Key is missing from configuration. "
-                "Bot execution will fail on authenticated endpoints (like placing orders)."
+                "CREDENTIAL WARNING: Binance API Key or Secret Key is missing or placeholder in configuration. "
+                "Bot execution will fall back to local mock execution mode for trading endpoints."
             )
             # Adjust default DB configurations if they are still at the live defaults (10.0 and 15.0)
             if self._get_db_value("max_position_size", 10.0) == 10.0:

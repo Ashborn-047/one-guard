@@ -4,7 +4,7 @@ from typing import Literal
 
 logger = logging.getLogger("OneGuard.Strategy.RSI")
 
-def generate_rsi_signal(df: pd.DataFrame, rsi_lower: float = 30.0, rsi_upper: float = 70.0) -> Literal["BUY", "SELL", "HOLD"]:
+def generate_rsi_signal(df: pd.DataFrame, rsi_lower: float = 45.0, rsi_upper: float = 55.0) -> Literal["BUY", "SELL", "HOLD"]:
     """
     Generates trading signals based on the Relative Strength Index (RSI).
     Args:

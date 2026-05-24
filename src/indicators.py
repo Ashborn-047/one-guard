@@ -32,7 +32,7 @@ def calculate_technical_indicators(candles_df: pd.DataFrame) -> Optional[Dict[st
         ema_slow_series = ta.ema(close=candles_df["close"], length=21)
         
         # 3. Compute Bollinger Bands (20, 2)
-        bb_df = ta.bbands(close=candles_df["close"], length=20, std=2)
+        bb_df = ta.bbands(close=candles_df["close"], length=20, std=1)
         if bb_df is None or bb_df.empty:
             logger.error("Failed to compute Bollinger Bands series.")
             return None
