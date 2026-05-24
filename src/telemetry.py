@@ -70,15 +70,16 @@ def alert_trade_entry(symbol: str, side: str, quantity: float, price: float, str
         📈 BUY  BTC/USDT
         Strategy : RSI
         Qty      : 0.00042 BTC
-        Price    : ~$95,200.00
+        Price    : ~₹7,935,000.00 INR
     """
     emoji = "📈" if side.upper() == "BUY" else "📉"
+    inr_price = price * settings.usdt_inr_rate
     message = (
         f"🛡️ *\\[OneGuard\\] TRADE ENTRY*\n"
         f"{emoji} *{side.upper()}*  `{symbol}`\n"
         f"Strategy : `{strategy}`\n"
         f"Qty      : `{quantity}`\n"
-        f"Price    : `~${price:,.2f}`"
+        f"Price    : `~₹{inr_price:,.2f} INR`"
     )
     logger.info(f"[TELEMETRY] Trade entry alert: {side} {symbol} via {strategy}")
     return send_telegram_message(message)
@@ -103,11 +104,13 @@ def alert_trade_exit(
         📉 SELL  BTC/USDT
         Strategy : RSI  |  Reason: stop_loss
         Qty      : 0.00042
-        Price    : ~$94,100.00
-        PnL      : -$0.46  ❌
+        Price    : ~₹7,830,000.00 INR
+        PnL      : -₹38.33 INR  ❌
     """
     emoji = "📈" if side.upper() == "BUY" else "📉"
-    pnl_display = f"+${pnl:,.2f} ✅" if pnl >= 0 else f"-${abs(pnl):,.2f} ❌"
+    inr_price = price * settings.usdt_inr_rate
+    inr_pnl = pnl * settings.usdt_inr_rate
+    pnl_display = f"+₹{inr_pnl:,.2f} INR ✅" if pnl >= 0 else f"-₹{abs(inr_pnl):,.2f} INR ❌"
     reason_label = {"stop_loss": "🔴 Stop Loss", "take_profit": "🟢 Take Profit"}.get(
         reason, "📊 Signal"
     )
@@ -117,7 +120,7 @@ def alert_trade_exit(
         f"{emoji} *{side.upper()}*  `{symbol}`\n"
         f"Strategy : `{strategy}`  |  Reason: {reason_label}\n"
         f"Qty      : `{quantity}`\n"
-        f"Price    : `~${price:,.2f}`\n"
+        f"Price    : `~₹{inr_price:,.2f} INR`\n"
         f"PnL      : `{pnl_display}`"
     )
     logger.info(f"[TELEMETRY] Trade exit alert: {side} {symbol} | PnL {pnl:+.4f} | reason={reason}")
@@ -131,15 +134,17 @@ def alert_drawdown_halt(weekly_pnl: float, limit: float) -> bool:
     Example output:
         🛡️ [OneGuard] ⛔ DRAWDOWN HALT
         Weekly PnL has hit the safety limit.
-        Realized : -$15.82
-        Limit    : -$15.00
+        Realized : -₹1,318.00 INR
+        Limit    : -₹1,250.00 INR
         Status   : TRADING SUSPENDED
     """
+    inr_weekly = weekly_pnl * settings.usdt_inr_rate
+    inr_limit = limit * settings.usdt_inr_rate
     message = (
         f"🛡️ *\\[OneGuard\\] ⛔ DRAWDOWN HALT*\n"
         f"Weekly PnL has breached the safety limit.\n"
-        f"Realized : `${weekly_pnl:,.2f}`\n"
-        f"Limit    : `${limit:,.2f}`\n"
+        f"Realized : `₹{inr_weekly:,.2f} INR`\n"
+        f"Limit    : `₹{inr_limit:,.2f} INR`\n"
         f"Status   : *TRADING SUSPENDED* 🔴"
     )
     logger.warning(f"[TELEMETRY] Drawdown halt alert | weekly_pnl={weekly_pnl:.2f} limit={limit:.2f}")

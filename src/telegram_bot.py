@@ -39,7 +39,8 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         perf_data = get_strategy_performance_data()
         if perf_data:
             total_pnl = sum(d["total_pnl"] for d in perf_data)
-            pnl_str = f"+${total_pnl:,.4f}" if total_pnl >= 0 else f"-${abs(total_pnl):,.4f}"
+            inr_pnl = total_pnl * settings.usdt_inr_rate
+            pnl_str = f"+₹{inr_pnl:,.2f} INR" if total_pnl >= 0 else f"-₹{abs(inr_pnl):,.2f} INR"
             total_trades = sum(d["total_trades"] for d in perf_data)
             paper_info = f"\n📈 **Paper Trading Stats**\nTotal Trades: {total_trades}\nNet PnL: {pnl_str}"
     except Exception as e:
@@ -49,7 +50,7 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         f"📊 **OneGuard Status**\n"
         f"Mode: {mode}\n"
         f"Status: {status}\n"
-        f"Max Trade Size: {settings.max_position_size} USDT"
+        f"Max Trade Size: ₹{settings.max_position_size * settings.usdt_inr_rate:.2f} INR"
         f"{paper_info}"
     )
 
@@ -161,13 +162,14 @@ async def mocktrade_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             order_id = order.get('id', 'unknown')
             price = order.get('price', 0.0)
             amount = order.get('amount', 0.0)
+            inr_price = price * settings.usdt_inr_rate
             await update.message.reply_text(
                 f"✅ Mock Trade Executed Successfully!\n\n"
                 f"Order ID: `{order_id}`\n"
                 f"Symbol: `{symbol}`\n"
                 f"Side: `{side}`\n"
                 f"Amount: `{amount}`\n"
-                f"Price: `{price}` USDT"
+                f"Price: `₹{inr_price:,.2f}` INR"
             )
         else:
             await update.message.reply_text("❌ Mock trade execution rejected by risk engine or failed. Check logs.")

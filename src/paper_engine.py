@@ -250,15 +250,18 @@ def get_leaderboard() -> str:
         pnl = data["total_pnl"]
         win_rate = (wins / total * 100) if total > 0 else 0.0
 
-        pnl_str = f"+${pnl:,.4f}" if pnl >= 0 else f"-${abs(pnl):,.4f}"
+        inr_pnl = pnl * settings.usdt_inr_rate
+        pnl_str = f"+₹{inr_pnl:,.2f} INR" if pnl >= 0 else f"-₹{abs(inr_pnl):,.2f} INR"
         pnl_emoji = "📈" if pnl >= 0 else "📉"
+        inr_best = data.get('best_trade_pnl', 0.0) * settings.usdt_inr_rate
+        inr_worst = data.get('worst_trade_pnl', 0.0) * settings.usdt_inr_rate
 
         lines.append(
             f"{medal} *{name}*\n"
             f"   PnL: `{pnl_str}` {pnl_emoji} | Win Rate: `{win_rate:.0f}%`\n"
             f"   Trades: `{total}` (W:{wins} / L:{losses})\n"
-            f"   Best: `${data.get('best_trade_pnl', 0):+.4f}` | "
-            f"Worst: `${data.get('worst_trade_pnl', 0):+.4f}`"
+            f"   Best: `₹{inr_best:+.2f} INR` | "
+            f"Worst: `₹{inr_worst:+.2f} INR`"
         )
 
     return "\n\n".join(lines)
@@ -272,13 +275,15 @@ def alert_paper_trade_entry(strategy: str, symbol: str, qty: float, price: float
     """Sends a Telegram notification for a paper trade entry."""
     strategy_labels = {"RSI": "RSI Mean Reversion", "BB": "Bollinger Band Bounce", "EMA": "EMA Crossover"}
     label = strategy_labels.get(strategy, strategy)
+    inr_price = price * settings.usdt_inr_rate
+    inr_budget = qty * price * settings.usdt_inr_rate
     message = (
         f"📝 *\\[OneGuard\\] PAPER TRADE*\n"
         f"📈 *BUY*  `{symbol}`\n"
         f"Strategy : `{label}`\n"
         f"Qty      : `{qty:.8f}`\n"
-        f"Price    : `~${price:,.2f}`\n"
-        f"Budget   : `~${qty * price:,.4f} USDT`"
+        f"Price    : `~₹{inr_price:,.2f} INR`\n"
+        f"Budget   : `~₹{inr_budget:,.2f} INR`"
     )
     return send_telegram_message(message)
 
@@ -289,7 +294,9 @@ def alert_paper_trade_exit(
     """Sends a Telegram notification for a paper trade exit with PnL."""
     strategy_labels = {"RSI": "RSI Mean Reversion", "BB": "Bollinger Band Bounce", "EMA": "EMA Crossover"}
     label = strategy_labels.get(strategy, strategy)
-    pnl_display = f"+${pnl:,.4f} ✅" if pnl >= 0 else f"-${abs(pnl):,.4f} ❌"
+    inr_price = price * settings.usdt_inr_rate
+    inr_pnl = pnl * settings.usdt_inr_rate
+    pnl_display = f"+₹{inr_pnl:,.2f} INR ✅" if pnl >= 0 else f"-₹{abs(inr_pnl):,.2f} INR ❌"
     reason_label = {
         "stop_loss": "🔴 Stop Loss",
         "take_profit": "🟢 Take Profit",
@@ -300,7 +307,7 @@ def alert_paper_trade_exit(
         f"📉 *SELL*  `{symbol}`\n"
         f"Strategy : `{label}`  |  {reason_label}\n"
         f"Qty      : `{qty:.8f}`\n"
-        f"Price    : `~${price:,.2f}`\n"
+        f"Price    : `~₹{inr_price:,.2f} INR`\n"
         f"PnL      : `{pnl_display}`"
     )
     return send_telegram_message(message)

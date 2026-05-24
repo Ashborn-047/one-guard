@@ -70,6 +70,7 @@ class Config:
         self.telegram_chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "").strip()
         self.db_file: str = os.getenv("DATABASE_FILE", "one_guard_trading.db").strip()
         self.database_url: str = os.getenv("DATABASE_URL", "").strip()
+        self.usdt_inr_rate: float = float(os.getenv("USDT_INR_RATE", "83.33").strip())
 
     @property
     def db_path(self) -> Path:
