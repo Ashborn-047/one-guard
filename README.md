@@ -1,200 +1,321 @@
-# OneGuard 🛡️
+# OneGuard
 
-A disciplined, safety-first algorithmic cryptocurrency trading bot built in Python. Designed around strict, hard-coded risk management guardrails, multi-strategy signal generation, and a real-time telemetry dashboard — built to trade responsibly, transparently, and autonomously.
+A safety-first algorithmic cryptocurrency trading bot built in Python. OneGuard combines strict risk guardrails, multi-strategy signal generation, local or hosted telemetry, Telegram controls, and an autonomous paper-trading comparison engine.
 
----
-
-## 🛠️ Tech Stack & Integrations
-
-<p align="left">
-  <a href="https://www.python.org/">
-    <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-  </a>
-  <a href="https://fastapi.tiangolo.com/">
-    <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
-  </a>
-  <a href="https://react.dev/">
-    <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
-  </a>
-  <a href="https://www.typescriptlang.org/">
-    <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  </a>
-  <a href="https://vite.dev/">
-    <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
-  </a>
-  <a href="https://www.sqlite.org/index.html">
-    <img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
-  </a>
-  <a href="https://ccxt.com/">
-    <img src="https://img.shields.io/badge/Exchange-CCXT-orange?style=for-the-badge&logo=bitcoin" alt="CCXT" />
-  </a>
-  <a href="https://pandas.pydata.org/">
-    <img src="https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white" alt="Pandas" />
-  </a>
-  <a href="https://numpy.org/">
-    <img src="https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white" alt="NumPy" />
-  </a>
-  <a href="https://framer.com/motion/">
-    <img src="https://img.shields.io/badge/Framer_Motion-purple?style=for-the-badge&logo=framer&logoColor=white" alt="Framer Motion" />
-  </a>
-  <a href="https://telegram.org/">
-    <img src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Alerting" />
-  </a>
-</p>
+The bot is designed to run conservatively: sandbox mode is the default, missing or placeholder exchange keys fall back to local mock execution, and every execution path passes through the risk engine before an order is logged.
 
 ---
 
-## ◈ How It Works
+## Tech Stack
 
-OneGuard operates as a fully automated execution pipeline. Every 15 minutes, it polls live market data, computes technical indicators, evaluates strategy signals, validates them through a centralized risk engine, and routes approved orders to the exchange — all while broadcasting real-time alerts to Telegram and serving telemetry to a dashboard interface.
+- Python 3.12
+- FastAPI + Uvicorn
+- React + TypeScript + Vite
+- CCXT for Binance market/exchange access
+- SQLite locally, optional Postgres via `DATABASE_URL`
+- SQLAlchemy
+- pandas, NumPy, pandas-ta
+- APScheduler
+- python-telegram-bot
+- Docker and Fly.io deployment support
+
+---
+
+## Latest Updates
+
+Recent changes from the latest git history are reflected here:
+
+- Added an autonomous paper-trading comparison engine that runs RSI, Bollinger Bands, and EMA strategies in isolated virtual portfolios.
+- Added paper-trade database tables for `paper_trades` and `strategy_performance`.
+- Added Telegram commands for `/leaderboard` and `/papertrades [strategy]`.
+- Converted Telegram alerts and bot command output to INR display values using `USDT_INR_RATE`.
+- Formatted trade quantities in telemetry alerts to 8 decimal places.
+- Added placeholder-key detection so sandbox and development runs fall back to mock execution instead of failing on exchange credentials.
+- Added smaller mock-mode defaults: `max_position_size=2.4` USDT and `weekly_drawdown_limit=1.2` USDT when credentials are missing or placeholders.
+- Added a unified production runner in `main.py` for the trading pipeline, FastAPI dashboard, and Telegram bot.
+- Added Docker and Fly.io deployment files: `Dockerfile`, `fly.toml`, and `.github/workflows/fly-deploy.yml`.
+- Disabled duplicate API-side background polling so the scheduler owns ingestion and Binance rate-limit pressure stays lower.
+- Added support for hosted dashboard access from GitHub Pages by pointing the frontend to the Fly API URL when needed.
+
+---
+
+## How It Works
+
+OneGuard runs a recurring execution pipeline:
+
+1. Fetch market candles through CCXT.
+2. Persist candles to the database.
+3. Calculate RSI, EMA, and Bollinger Band indicators.
+4. Evaluate all strategies.
+5. Validate any trade request through the risk engine.
+6. Execute live, sandbox, or mock orders.
+7. Log trades, paper trades, fees, and PnL.
+8. Push telemetry and command responses to Telegram.
+9. Serve bot state, charts, metrics, settings, and trade history through the dashboard API.
 
 ```mermaid
 graph TD
-    subgraph Ingestion [Data Pipeline]
-        MKT[Exchange Market Data] -->|Poll / 15m| REST[REST API]
-        REST -->|CCXT Client| DB_WRITE[(SQLite WAL)]
-        DB_WRITE -->|Compute| IND[pandas-ta Indicators]
-    end
-
-    subgraph Strategies [Strategy Layer]
-        IND -->|RSI| STRA[RSI Mean Reversion]
-        IND -->|Bollinger Bands| STRB[BB Bounce]
-        IND -->|EMA Cross| STRC[EMA Trend Follow]
-    end
-
-    subgraph Defense [Risk Engine]
-        STRA -->|BUY / SELL| RISK{Risk Guard}
-        STRB -->|BUY / SELL| RISK
-        STRC -->|BUY / SELL| RISK
-        RISK -->|Validated Signal| EXEC[Execution Router]
-    end
-
-    subgraph Output [Interfaces & Telemetry]
-        EXEC -->|Sandbox / Live| EX_API[Exchange Order API]
-        EX_API -->|Log Trade| DB_WRITE
-        DB_WRITE -->|Query Logs| DASH[FastAPI + React Dashboard]
-        EX_API -->|Push Alert| TG[Telegram Bot]
-    end
+    MKT[Binance market data] --> API[CCXT client]
+    API --> DB[(SQLite or Postgres)]
+    DB --> IND[Indicator engine]
+    IND --> RSI[RSI strategy]
+    IND --> BB[Bollinger strategy]
+    IND --> EMA[EMA strategy]
+    RSI --> RISK{Risk engine}
+    BB --> RISK
+    EMA --> RISK
+    RISK --> EXEC[Execution router]
+    EXEC --> MOCK[Mock execution]
+    EXEC --> EXCH[Sandbox or live exchange]
+    EXEC --> TRADES[(Trade ledger)]
+    IND --> PAPER[Paper comparison engine]
+    PAPER --> PERF[(Strategy performance)]
+    TRADES --> DASH[FastAPI and React dashboard]
+    PERF --> TG[Telegram commands]
+    EXEC --> TG
 ```
 
 ---
 
-## ◈ Risk Engine Guardrails
+## Risk Engine Guardrails
 
-Before any order reaches the exchange, it must pass a strict security and capital evaluation layer:
+Before an order reaches live, sandbox, or mock execution, it must pass the central safety layer:
 
-*   **Emergency Halt Switch** — `EMERGENCY_HALT=TRUE` in `.env` instantly suspends all execution loops.
-*   **Weekly Drawdown Cap** — Auto-halts the bot if weekly realized losses exceed the configured limit (default: `$15.00 USDT`).
-*   **Loss Cooldown** — A 30-minute block activates automatically after any trade ends in a realized loss, mitigating emotional revenge trading.
-*   **Duplicate Position Guard** — Restricts the bot to only one open position per symbol at any time.
-*   **Max Concurrent Trades Cap** — Caps open positions at a maximum of 3 across all symbols to protect capital.
-*   **Strategy Isolation Lock** — Exit (SELL) orders are strictly validated to ensure they are processed by the same strategy module that initiated the entry (BUY) order.
+- `EMERGENCY_HALT=TRUE` pauses new executions.
+- Weekly realized drawdown is capped.
+- A loss cooldown blocks immediate re-entry after realized losses.
+- Duplicate open positions per symbol are blocked.
+- Total open positions are capped by `MAX_OPEN_TRADES`.
+- SELL orders are strategy-aware and validated against the owning strategy path.
+- Stop-loss and take-profit checks are run against open positions.
 
----
-
-## ◈ Strategies
-
-| Strategy | Signal Logic | Timeframe | Indicators |
-|---|---|---|---|
-| **RSI Mean Reversion** | BUY when RSI < 30 (oversold region), SELL when RSI > 70 (overbought region). | 15m | RSI (14) |
-| **Bollinger Band Bounce** | BUY when close crosses below lower band, SELL when close crosses above upper band. | 15m | Bollinger Bands (20, 2) |
-| **EMA Crossover** | BUY on Golden Cross (EMA 9 crossed above EMA 21), SELL on Death Cross. | 15m | EMA (9), EMA (21) |
+Defaults are intentionally smaller in mock mode. If Binance keys are missing or still set to placeholders, OneGuard uses local mock execution and adjusts default risk settings to a smaller sandbox budget.
 
 ---
 
-## ◈ Setup & Installation
+## Strategies
+
+| Strategy | Signal Logic | Indicators |
+|---|---|---|
+| RSI Mean Reversion | BUY on oversold threshold crossover, SELL on overbought threshold crossover. | RSI 14 |
+| Bollinger Band Bounce | BUY/SELL based on lower and upper band interactions. | Bollinger Bands |
+| EMA Crossover | BUY on fast EMA crossing above slow EMA, SELL on fast EMA crossing below slow EMA. | EMA 9, EMA 21 |
+
+The paper engine runs all three strategies in parallel with isolated virtual positions, 2% stop-loss, 4% take-profit, and a simulated 0.1% fee.
+
+---
+
+## Setup
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/Ashborn-047/one-guard.git
 cd one-guard
 ```
 
-### 2. Set up the virtual environment
+### 2. Create and activate a virtual environment
+
 ```bash
 python -m venv venv
+```
 
-# Windows (PowerShell)
+Windows PowerShell:
+
+```powershell
 .\venv\Scripts\Activate.ps1
+```
 
-# Linux / macOS
+Linux or macOS:
+
+```bash
 source venv/bin/activate
 ```
 
-### 3. Install dependencies
+### 3. Install Python dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment
+### 4. Install frontend dependencies
+
+```bash
+cd dashboard/frontend
+npm install
+cd ../..
+```
+
+### 5. Configure environment variables
+
 ```bash
 cp .env.example .env
 ```
-Edit `.env` with your Binance API credentials and Telegram bot details.
 
-> [!CAUTION]
-> Never commit `.env` to version control. Exchange API keys must have **Read + Trade** permissions only — **Withdrawals must be strictly disabled**.
+Edit `.env` with your credentials and runtime settings.
+
+Important variables:
+
+| Variable | Purpose |
+|---|---|
+| `ONEGUARD_MODE` | `sandbox` or `live`. Sandbox is recommended until fully verified. |
+| `BINANCE_API_KEY` / `BINANCE_SECRET_KEY` | Binance credentials. Placeholder or missing values trigger mock execution. |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Enables Telegram alerts and commands. |
+| `DATABASE_FILE` | Local SQLite database file. |
+| `DATABASE_URL` | Optional hosted Postgres connection string. |
+| `USDT_INR_RATE` | INR display conversion rate for Telegram output. Defaults to `83.33`. |
+| `EMERGENCY_HALT` | Set to `TRUE` to pause new execution cycles. |
+
+Keep withdrawals disabled on exchange API keys. Trade and read permissions are enough for this project.
 
 ---
 
-## ◈ How to Run
+## Running Locally
 
-### Command Center Dashboard
-Start the unified control panel (FastAPI backend + Vite React frontend running concurrently):
+### Unified app runner
+
+Runs the trading pipeline, FastAPI dashboard, and Telegram bot process together:
+
+```bash
+python main.py
+```
+
+Dashboard/API:
+
+```text
+http://localhost:8000
+```
+
+### Development dashboard launcher
+
+Runs the FastAPI API on port `8000` and the Vite frontend on port `5173`:
+
 ```bash
 python run_dashboard.py
 ```
-*   **API Telemetry Port:** `http://localhost:8000`
-*   **Frontend Dashboard Port:** `http://localhost:5173`
 
-### Execution Pipeline
+Frontend:
 
-#### 1. Run in Sandbox / Paper mode (Single iteration)
+```text
+http://localhost:5173
+```
+
+### Pipeline only
+
+Run one cycle:
+
 ```bash
 python -m src.pipeline --once
 ```
 
-#### 2. Run the continuous Cron Scheduler
+Run the scheduler:
+
 ```bash
 python -m src.pipeline
 ```
 
 ---
 
-## ◈ Development Progress & Lifecycle
+## Telegram Commands
 
-Track real-time implementation progress, module health, and developer logs in the interactive project command center:
-```
-project_status.html  ← open in any browser
-```
+When `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured, the Telegram bot supports:
 
-The system progress is broken down into 7 milestone phases:
+| Command | Description |
+|---|---|
+| `/status` | Shows mode, halt status, max trade size, and paper-trading summary. |
+| `/pause` | Activates emergency halt. |
+| `/resume` | Clears emergency halt. |
+| `/trade` | Triggers a manual pipeline evaluation cycle. |
+| `/mocktrade <buy|sell> <symbol>` | Executes a manual mock/simulated trade. |
+| `/leaderboard` | Shows strategy comparison performance. |
+| `/papertrades [strategy]` | Shows recent paper trades, optionally filtered by RSI, BB, or EMA. |
 
-1.  **Phase 1: Environment & Tooling** — Setup, credentials isolation, and settings validator class. `[100% Complete]`
-2.  **Phase 2: Ingestion & Indicators** — CCXT exchange fetchers, SQLite WAL cache tables, and `pandas-ta` indicator engine. `[100% Complete]`
-3.  **Phase 3: Core Logic & Risk Engine** — Centralized risk guards, strategy module definitions, execution routing logic, and scheduler loop. `[100% Complete]`
-4.  **Phase 4: Telemetry & Dashboard** — Non-blocking Telegram alerting, FastAPI endpoints, Vite React glassmorphic UI, and TradingView charting. `[100% Complete]`
-5.  **Phase 5: Continuous Sandbox Paper Trading** — Dry-run testing on Binance Testnet, clock sync validation checks, and multi-day stability test cycles. `[In Progress]`
-6.  **Phase 6: Strategy Selection & Validation** — Statistical metrics analysis over 2–3 weeks to assert win rate > 55%. `[Planned]`
-7.  **Phase 7: Go Live** — Live API permissions check, VPS daemonization, and capital scaling configuration. `[Planned]`
+Telegram trade alerts display INR prices/PnL and quantities with 8 decimal places.
 
 ---
 
-## ◈ Verification & Quality Assurance
+## Dashboard API
 
-Always run unit tests before proposing or committing code changes:
+The FastAPI service exposes:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/status` | Execution mode, halt state, risk settings, and mock-mode flag. |
+| `GET /api/metrics` | Trade counts, realized PnL, win rate, profit factor, and drawdown status. |
+| `GET /api/positions` | Active positions with live valuation, SL, and TP levels. |
+| `GET /api/chart` | Candles plus EMA, RSI, and Bollinger data for the frontend chart. |
+| `GET /api/trades` | Historical trade ledger, with exchange sync when real keys are configured. |
+| `GET /api/symbols` | Symbols available in the candle database. |
+| `POST /api/settings` | Updates mode, halt, and guardrail settings dynamically. |
+
+The React dashboard can run locally through Vite or be served from the built `dashboard/frontend/dist` bundle by FastAPI.
+
+---
+
+## Deployment
+
+The repository includes deployment support for Fly.io:
+
+- `Dockerfile` builds the Python app and bundled React dashboard.
+- `fly.toml` targets the `bom` region and exposes port `8000`.
+- `.github/workflows/fly-deploy.yml` deploys on pushes to `main` when `FLY_API_TOKEN` is configured as a GitHub secret.
+
+Manual deploy:
+
+```bash
+flyctl deploy --remote-only
+```
+
+Build the frontend before deploying if frontend source changed:
+
+```bash
+cd dashboard/frontend
+npm run build
+cd ../..
+```
+
+---
+
+## Verification
+
+Run the Python test suite:
+
 ```bash
 python -m unittest tests/test_risk_and_strategies.py
 ```
 
+Build the frontend:
+
+```bash
+cd dashboard/frontend
+npm run build
+cd ../..
+```
+
 ---
 
-## ◈ Documentation
+## Project Files
 
-Deep-dive architectural decisions and system limits are stored in the `doc/` directory:
+| Path | Purpose |
+|---|---|
+| `main.py` | Unified production runner. |
+| `src/pipeline.py` | Scheduled market ingestion, indicators, strategy evaluation, execution, and paper cycle. |
+| `src/execution.py` | Exchange/mock order execution and trade logging. |
+| `src/risk.py` | Safety guardrails and position sizing. |
+| `src/paper_engine.py` | Autonomous paper-trading strategy comparison. |
+| `src/telegram_bot.py` | Telegram command handlers. |
+| `src/telemetry.py` | Telegram alert formatting/sending. |
+| `src/db.py` | SQLite/Postgres schema and data access. |
+| `dashboard/api.py` | FastAPI telemetry and settings API. |
+| `dashboard/frontend/` | React dashboard. |
+| `doc/` | Architecture notes, milestones, and implementation planning docs. |
 
-*   🎯 [Goals & Vision](file:///e:/My%20Projects%20/%20Crypto%20Bot/doc/01_goals_and_vision.md) — Product mission and core tenets
-*   📋 [Step-by-Step Process](file:///e:/My%20Projects%20/%20Crypto%20Bot/doc/02_step_by_step_process.md) — 9-step implementation roadmap
-*   ⚠️ [Known Hurdles](file:///e:/My%20Projects%20/%20Crypto%20Bot/doc/03_known_hurdles.md) — Exchange weight limit rules, clock offsets, and SQLite concurrency mitigation
-*   📈 [Milestones & Performance Targets](file:///e:/My%20Projects%20/%20Crypto%20Bot/doc/04_milestones_and_targets.md) — Statistics targets, drawdown checks, and budget allocations
-*   ⚙️ [Technical Development Phases](file:///e:/My%20Projects%20/%20Crypto%20Bot/doc/05_tech_phases.md) — Developmental phase breakdown and requirements
+---
+
+## Notes
+
+- Start in `sandbox` or mock mode.
+- Missing or placeholder Binance keys are intentionally treated as mock execution.
+- Keep `.env` out of version control.
+- Use real API keys only after paper results and risk settings have been reviewed.
+- The dashboard API throttles exchange trade sync and avoids duplicate background market polling to reduce rate-limit risk.
