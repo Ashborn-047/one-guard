@@ -684,6 +684,20 @@ def get_strategy_performance_data() -> List[Dict[str, Any]]:
         return []
 
 
+def reset_strategy_performance() -> bool:
+    """
+    Resets the strategy performance leaderboard by clearing the running totals.
+    """
+    try:
+        with get_db_connection() as conn:
+            conn.execute(text("DELETE FROM strategy_performance;"))
+            logger.info("Strategy performance leaderboard has been reset.")
+            return True
+    except Exception as e:
+        logger.error(f"Error resetting strategy performance: {e}")
+        return False
+
+
 def update_strategy_performance(strategy: str, pnl: float, is_win: bool) -> bool:
     """
     Updates the cumulative performance metrics for a strategy after a closed trade (SELL).

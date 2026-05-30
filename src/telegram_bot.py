@@ -179,6 +179,19 @@ async def mocktrade_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         logger.error(f"Error during mock trade execution: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Error: {e}")
 
+async def resetstats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not verify_user(update): return
+    try:
+        from src.db import reset_strategy_performance
+        success = reset_strategy_performance()
+        if success:
+            await update.message.reply_text("✅ **Leaderboard Reset Successful**\nAll old paper trading strategy statistics have been wiped. The leaderboard will now start fresh from the next completed trade!")
+        else:
+            await update.message.reply_text("❌ Failed to reset strategy performance. Check logs.")
+    except Exception as e:
+        logger.error(f"Error resetting stats: {e}")
+        await update.message.reply_text(f"❌ Error: {e}")
+
 def create_bot_application() -> Application:
     if not settings.telegram_token:
         logger.warning("No Telegram token provided. Bot will not start.")
@@ -194,6 +207,7 @@ def create_bot_application() -> Application:
     app.add_handler(CommandHandler("mocktrade", mocktrade_cmd))
     app.add_handler(CommandHandler("leaderboard", leaderboard_cmd))
     app.add_handler(CommandHandler("papertrades", papertrades_cmd))
+    app.add_handler(CommandHandler("resetstats", resetstats_cmd))
     
     return app
 
