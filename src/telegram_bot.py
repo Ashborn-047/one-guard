@@ -42,7 +42,9 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             inr_pnl = total_pnl * settings.usdt_inr_rate
             pnl_str = f"+₹{inr_pnl:,.2f} INR" if total_pnl >= 0 else f"-₹{abs(inr_pnl):,.2f} INR"
             total_trades = sum(d["total_trades"] for d in perf_data)
-            paper_info = f"\n📈 **Paper Trading Stats**\nTotal Trades: {total_trades}\nNet PnL: {pnl_str}"
+            total_wins = sum(d.get("winning_trades", 0) for d in perf_data)
+            total_losses = sum(d.get("losing_trades", 0) for d in perf_data)
+            paper_info = f"\n📈 **Paper Trading Stats**\nTotal Trades: {total_trades} (W:{total_wins} / L:{total_losses})\nNet PnL: {pnl_str}"
     except Exception as e:
         logger.error(f"Error reading paper stats for status: {e}")
         
