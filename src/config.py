@@ -223,6 +223,14 @@ class Config:
     def loss_cooldown_minutes(self, val: int):
         self._set_db_value("loss_cooldown_minutes", val)
 
+    @property
+    def use_atr_sl(self) -> bool:
+        return self._get_db_value("use_atr_sl", os.getenv("USE_ATR_SL", "FALSE").strip().upper() == "TRUE")
+
+    @use_atr_sl.setter
+    def use_atr_sl(self, val: bool):
+        self._set_db_value("use_atr_sl", val)
+
     def validate(self) -> bool:
         """
         Validates the configuration properties.

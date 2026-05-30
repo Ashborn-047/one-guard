@@ -99,16 +99,24 @@ def calculate_position_size(symbol: str, current_price: float) -> float:
     return qty
 
 
-def calculate_sl_tp(side: str, entry_price: float, sl_percent: float = 0.02, tp_percent: float = 0.04) -> Tuple[float, float]:
+def calculate_sl_tp(side: str, entry_price: float, sl_percent: float = 0.02, tp_percent: float = 0.04,
+                    use_atr_sl: bool = False, atr_value: Optional[float] = None, atr_multiplier: float = 1.5) -> Tuple[float, float]:
     """
     Calculates hard stop-loss and take-profit price levels.
     Default parameters from process guidelines: 2% Stop Loss, 4% Take Profit.
+    If use_atr_sl is True and atr_value is provided, computes SL dynamically using ATR.
     """
     if side.upper() == "BUY":
-        stop_loss = entry_price * (1.0 - sl_percent)
+        if use_atr_sl and atr_value is not None:
+            stop_loss = entry_price - (atr_value * atr_multiplier)
+        else:
+            stop_loss = entry_price * (1.0 - sl_percent)
         take_profit = entry_price * (1.0 + tp_percent)
     else:  # SELL (for short setups, or exit rules)
-        stop_loss = entry_price * (1.0 + sl_percent)
+        if use_atr_sl and atr_value is not None:
+            stop_loss = entry_price + (atr_value * atr_multiplier)
+        else:
+            stop_loss = entry_price * (1.0 + sl_percent)
         take_profit = entry_price * (1.0 - tp_percent)
         
     return round(stop_loss, 4), round(take_profit, 4)

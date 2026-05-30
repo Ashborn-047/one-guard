@@ -37,6 +37,12 @@ def calculate_technical_indicators(candles_df: pd.DataFrame) -> Optional[Dict[st
             logger.error("Failed to compute Bollinger Bands series.")
             return None
             
+        # 4. Compute ATR (14)
+        atr_series = ta.atr(high=candles_df["high"], low=candles_df["low"], close=candles_df["close"], length=14)
+        if atr_series is None or atr_series.empty:
+            logger.error("Failed to compute ATR series.")
+            return None
+            
         # Extract the latest values (last row in DataFrame)
         latest_idx = candles_df.index[-1]
         
@@ -53,6 +59,7 @@ def calculate_technical_indicators(candles_df: pd.DataFrame) -> Optional[Dict[st
             "bb_upper": float(bb_df.loc[latest_idx, bbu_col]) if not pd.isna(bb_df.loc[latest_idx, bbu_col]) else None,
             "bb_middle": float(bb_df.loc[latest_idx, bbm_col]) if not pd.isna(bb_df.loc[latest_idx, bbm_col]) else None,
             "bb_lower": float(bb_df.loc[latest_idx, bbl_col]) if not pd.isna(bb_df.loc[latest_idx, bbl_col]) else None,
+            "atr": float(atr_series.loc[latest_idx]) if not pd.isna(atr_series.loc[latest_idx]) else None,
         }
         
         logger.debug(f"Calculated Indicators: {latest_values}")

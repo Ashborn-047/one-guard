@@ -31,11 +31,11 @@ def generate_rsi_signal(df: pd.DataFrame, rsi_lower: float = 30.0, rsi_upper: fl
     # If previous candle RSI was above 30, and current is below 30, trigger BUY
     if prev_row is not None and not pd.isna(prev_row['rsi']):
         prev_rsi = prev_row['rsi']
-        if prev_rsi >= rsi_lower and rsi_val < rsi_lower:
+        if prev_rsi <= rsi_lower and rsi_val > rsi_lower:
             logger.info(f"RSI Oversold Crossover: {prev_rsi:.2f} -> {rsi_val:.2f} (Threshold: {rsi_lower}) | BUY Signal")
             return "BUY"
-        # Check for crossover of overbought threshold (RSI crossing above 70)
-        elif prev_rsi <= rsi_upper and rsi_val > rsi_upper:
+        # Check for crossover of overbought threshold (RSI crossing below 70)
+        elif prev_rsi >= rsi_upper and rsi_val < rsi_upper:
             logger.info(f"RSI Overbought Crossover: {prev_rsi:.2f} -> {rsi_val:.2f} (Threshold: {rsi_upper}) | SELL Signal")
             return "SELL"
     else:
