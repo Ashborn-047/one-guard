@@ -69,9 +69,29 @@ def execute_market_order(
         # Format quantity to match exchange rules
         qty_formatted = float(exchange.amount_to_precision(symbol, qty))
         
-        # Double check quantity is not zero after precision rounding
-        if qty_formatted <= 0:
-            logger.warning(f"Quantity rounded to 0 under exchange rules for {symbol}. Skipped.")
+        # Double check quantity against exchange minimums and precision
+        min_amount = 0.0
+        if symbol in exchange.markets and 'limits' in exchange.markets[symbol] and 'amount' in exchange.markets[symbol]['limits']:
+            min_amount = exchange.markets[symbol]['limits']['amount'].get('min', 0.0)
+            
+        if qty_formatted <= 0 or (min_amount and qty_formatted < min_amount):
+            logger.warning(f"Quantity {qty_formatted} is below exchange minimum {min_amount} for {symbol}. Skipped.")
+            if side_upper == "SELL":
+                logger.info(f"Clearing dust position of {qty} for {symbol} from database to prevent infinite loops.")
+                trade_timestamp = int(time.time() * 1000)
+                trade_data = {
+                    "timestamp": trade_timestamp,
+                    "symbol": symbol,
+                    "strategy": f"{strategy}_dust_clear",
+                    "side": "SELL",
+                    "price": current_price,
+                    "amount": qty,
+                    "cost": 0.0,
+                    "fee": 0.0,
+                    "pnl": 0.0,
+                    "order_id": f"dust_clear_{trade_timestamp}"
+                }
+                log_trade(trade_data)
             return None
             
         logger.info(f"PLACING MARKET ORDER: {side_upper} {qty_formatted} {symbol} (Strategy: {strategy})")
@@ -174,14 +194,28 @@ def execute_market_order(
 
         return order
 
-    except ccxt.InsufficientFunds as e:
-        err_msg = f"INSUFFICIENT FUNDS: Could not execute {side_upper} {symbol}. Check exchange wallet balance."
+    except (ccxt.InsufficientFunds, ccxt.InvalidOrder) as e:
+        err_msg = f"ORDER REJECTED ({type(e).__name__}): Could not execute {side_upper} {symbol}. Details: {e}"
         logger.error(err_msg)
         alert_system_error(f"{side_upper} {symbol}", e)
-    except ccxt.InvalidOrder as e:
-        err_msg = f"INVALID ORDER: Order rejected by exchange for {symbol}. Details: {e}"
-        logger.error(err_msg)
-        alert_system_error(f"{side_upper} {symbol}", e)
+        
+        # Prevent infinite loops: If a SELL order is rejected, clear it from DB
+        if side_upper == "SELL":
+            logger.warning(f"Clearing failed/dust position for {symbol} from database to prevent infinite loops.")
+            trade_timestamp = int(time.time() * 1000)
+            trade_data = {
+                "timestamp": trade_timestamp,
+                "symbol": symbol,
+                "strategy": f"{strategy}_error_clear",
+                "side": "SELL",
+                "price": current_price if 'current_price' in locals() else 0.0,
+                "amount": qty if 'qty' in locals() else 0.0,
+                "cost": 0.0,
+                "fee": 0.0,
+                "pnl": 0.0,
+                "order_id": f"error_clear_{trade_timestamp}"
+            }
+            log_trade(trade_data)
     except ccxt.RateLimitExceeded as e:
         logger.error(f"RATE LIMIT EXCEEDED: CCXT rate-limiter block on {symbol}.")
     except Exception as e:
