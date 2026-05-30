@@ -192,6 +192,26 @@ async def resetstats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.error(f"Error resetting stats: {e}")
         await update.message.reply_text(f"❌ Error: {e}")
 
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not verify_user(update): return
+    help_text = (
+        "🤖 **OneGuard Bot Commands**\n\n"
+        "**System & Status**\n"
+        "🔹 `/start` - Start the bot\n"
+        "🔹 `/help` - List all commands\n"
+        "🔹 `/status` - Check bot status and overall PnL\n"
+        "🔹 `/pause` - Pause the trading engine\n"
+        "🔹 `/resume` - Resume the trading engine\n\n"
+        "**Trading & Performance**\n"
+        "🔹 `/leaderboard` - View performance of each strategy\n"
+        "🔹 `/papertrades` - View the active/open paper trades\n"
+        "🔹 `/resetstats` - Wipe historical performance metrics\n\n"
+        "**Manual Controls**\n"
+        "🔹 `/trade <symbol> <side> <amount>` - Execute real trade\n"
+        "🔹 `/mocktrade <symbol> <side> <amount>` - Execute paper trade\n"
+    )
+    await update.message.reply_text(help_text, parse_mode="Markdown")
+
 def create_bot_application() -> Application:
     if not settings.telegram_token:
         logger.warning("No Telegram token provided. Bot will not start.")
@@ -200,6 +220,7 @@ def create_bot_application() -> Application:
     app = Application.builder().token(settings.telegram_token).build()
     
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CommandHandler("pause", pause_cmd))
     app.add_handler(CommandHandler("resume", resume_cmd))
